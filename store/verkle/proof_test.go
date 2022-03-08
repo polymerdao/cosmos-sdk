@@ -1,12 +1,13 @@
 package verkle
 
 import (
+	"testing"
+
 	"github.com/cosmos/cosmos-sdk/db/memdb"
 	"github.com/gballet/go-verkle"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/sha3"
-	"testing"
 )
 
 func TestProofOpInterface(t *testing.T) {
@@ -29,6 +30,7 @@ func TestProofOpInterface(t *testing.T) {
 
 	storeProofOp := NewProofOp(root, key, pe)
 	require.NotNil(t, storeProofOp)
+
 	// inclusion proof
 	r, err := storeProofOp.Run([][]byte{val})
 	assert.NoError(t, err)
@@ -59,15 +61,16 @@ func TestProofOpInterface(t *testing.T) {
 	assert.Equal(t, key, tmProofOp.Key, key)
 	assert.NotEmpty(t, tmProofOp.Data)
 
-	//decode
-	decoded, err := ProofDecoder(tmProofOp)
+	// decode
+	decodedWithoutRoot, err := ProofDecoder(tmProofOp, nil)
 	assert.NoError(t, err)
-	assert.NotNil(t, decoded)
-	assert.Equal(t, key, decoded.GetKey())
+	assert.NotNil(t, decodedWithoutRoot)
+	assert.Equal(t, key, decodedWithoutRoot.GetKey())
 
 	// run proof after decoding
-	r, err = decoded.Run([][]byte{val})
+	decodedWithRoot, err := ProofDecoder(tmProofOp, root)
+	assert.NoError(t, err)
+	r, err = decodedWithRoot.Run([][]byte{val})
 	assert.NoError(t, err)
 	assert.NotEmpty(t, r)
-	assert.Equal(t, root, r[0])
 }
