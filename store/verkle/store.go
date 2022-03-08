@@ -1,6 +1,7 @@
 package verkle
 
 import (
+	"bytes"
 	"encoding/hex"
 	"errors"
 	"github.com/gballet/go-verkle"
@@ -57,7 +58,10 @@ func LoadStore(db dbm.DBReadWriter) *Store {
 			return nil
 		}
 	}
-	iter.Close()
+	err = iter.Close()
+	if err != nil {
+		panic(err)
+	}
 
 	return &Store{
 		tree:      tree,
@@ -66,11 +70,15 @@ func LoadStore(db dbm.DBReadWriter) *Store {
 	}
 }
 
-func (s *Store) GetProof(key []byte) (*tmcrypto.ProofOps, error) {
+func (s *Store) GetRoot() verkle.VerkleNode {
+	return s.tree
+}
+
+func (s *Store) GetProof(_ []byte) (*tmcrypto.ProofOps, error) {
 	panic("not implemented")
 }
 
-func (s *Store) GetProofICS23(key []byte) (*ics23.CommitmentProof, error) {
+func (s *Store) GetProofICS23(_ []byte) (*ics23.CommitmentProof, error) {
 	panic("not implemented")
 }
 
@@ -81,8 +89,12 @@ func (s *Store) Get(key []byte) []byte {
 	if len(key) == 0 {
 		panic(errKeyEmpty)
 	}
-	path := sha3.Sum256(key)
-	val, err := s.tree.Get(path[:], nil)
+	keyPath := sha3.Sum256(key)
+	valPath, err := s.tree.Get(keyPath[:], nil)
+	if err != nil {
+		panic(err)
+	}
+	val, err := s.preimages.Get(valPath)
 	if err != nil {
 		panic(err)
 	}
@@ -94,12 +106,15 @@ func (s *Store) Has(key []byte) bool {
 	if len(key) == 0 {
 		panic(errKeyEmpty)
 	}
-	path := sha3.Sum256(key)
-	has, err := s.preimages.Has(path[:])
+	keyPath := sha3.Sum256(key)
+	valPath, err := s.tree.Get(keyPath[:], nil)
 	if err != nil {
+		panic(err)
+	}
+	if valPath == nil {
 		return false
 	}
-	return has
+	return !bytes.Equal(valPath, zeroKey)
 }
 
 // Set sets the key. Panics on nil key or value.
@@ -110,16 +125,18 @@ func (s *Store) Set(key []byte, value []byte) {
 	if value == nil {
 		panic(errValueNil)
 	}
-	path := sha3.Sum256(key)
-	err := s.tree.Insert(path[:], value, nil)
+	keyPath := sha3.Sum256(key)
+	valuePath := sha3.Sum256(value)
+	err := s.tree.Insert(keyPath[:], valuePath[:], nil)
 	if err != nil {
 		panic(err)
 	}
-	err = s.values.Set(path[:], value)
+	err = s.values.Set(keyPath[:], valuePath[:])
 	if err != nil {
 		return
 	}
-	err = s.preimages.Set(path[:], key)
+	err = s.preimages.Set(keyPath[:], key)
+	err = s.preimages.Set(valuePath[:], value)
 	if err != nil {
 		return
 	}
@@ -141,6 +158,7 @@ func (s *Store) Delete(key []byte) {
 	if err != nil {
 		return
 	}
+	// valuePath is not deleted in case there are duplicate values in the tree
 	err = s.preimages.Delete(path[:])
 	if err != nil {
 		return

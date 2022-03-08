@@ -1,6 +1,7 @@
 package verkle
 
 import (
+	"github.com/stretchr/testify/require"
 	"testing"
 
 	"github.com/cosmos/cosmos-sdk/db/memdb"
@@ -26,6 +27,10 @@ func TestGetSetHasDelete(t *testing.T) {
 	assert.Panics(t, func() { s.Set(nil, []byte("value")) }, "Set(nil key) should panic")
 	assert.Panics(t, func() { s.Set([]byte{}, []byte("value")) }, "Set(empty key) should panic")
 	assert.Panics(t, func() { s.Set([]byte("key"), nil) }, "Set(nil value) should panic")
+
+	s.Set([]byte("foo1foo2foo3foo4foo5foo6foo7foo8foo9"), []byte("bar1bar2bar3bar4bar5bar6bar7bar8bar9"))
+	assert.Equal(t, []byte("bar1bar2bar3bar4bar5bar6bar7bar8bar9"), s.Get([]byte("foo1foo2foo3foo4foo5foo6foo7foo8foo9")))
+	assert.Equal(t, true, s.Has([]byte("foo1foo2foo3foo4foo5foo6foo7foo8foo9")))
 }
 
 func TestLoadStore(t *testing.T) {
@@ -37,16 +42,17 @@ func TestLoadStore(t *testing.T) {
 	s.Set([]byte{1}, []byte{1})
 	s.Delete([]byte{1})
 	ss, err := s.tree.Serialize()
-	assert.Equal(t, err, nil)
+	require.NoError(t, err)
 
 	s2 := LoadStore(txn)
 	ss2, err2 := s2.tree.Serialize()
+	require.NoError(t, err2)
 	assert.Equal(t, ss, ss2)
 	assert.Equal(t, []byte{0}, s2.Get([]byte{0}))
 	assert.False(t, s2.Has([]byte{1}))
 	s2.Set([]byte{2}, []byte{2})
 
 	ss2, err2 = s2.tree.Serialize()
-	assert.Equal(t, err2, nil)
+	require.NoError(t, err2)
 	assert.NotEqual(t, ss, ss2)
 }
