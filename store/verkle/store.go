@@ -94,6 +94,10 @@ func (s *Store) Get(key []byte) []byte {
 	if err != nil {
 		panic(err)
 	}
+	// key doesn't exist
+	if valPath == nil {
+		return nil
+	}
 	val, err := s.preimages.Get(valPath)
 	if err != nil {
 		panic(err)
