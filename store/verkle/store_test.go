@@ -19,8 +19,8 @@ func TestGetSetHasDelete(t *testing.T) {
 	assert.Equal(t, true, s.Has([]byte("foo")))
 	s.Delete([]byte("foo"))
 	assert.Equal(t, false, s.Has([]byte("foo")))
+	assert.Equal(t, []byte{}, s.Get([]byte("bar")))
 
-	assert.Panics(t, func() { s.Get([]byte("bar")) }, "Get(nonexistent key) should panic")
 	assert.Panics(t, func() { s.Get(nil) }, "Get(nil key) should panic")
 	assert.Panics(t, func() { s.Get([]byte{}) }, "Get(empty key) should panic")
 	assert.Panics(t, func() { s.Has(nil) }, "Has(nil key) should panic")
