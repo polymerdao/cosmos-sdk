@@ -7,9 +7,8 @@ import (
 	"github.com/gballet/go-verkle"
 )
 
-// Ethereum's Verkle test
-func TestReproduceTree(t *testing.T) {
-	presentKeys := [][]byte{
+var (
+	presentKeys = [][]byte{
 		common.Hex2Bytes("318dea512b6f3237a2d4763cf49bf26de3b617fb0cabe38a97807a5549df4d01"),
 		common.Hex2Bytes("e6ed6c222e3985050b4fc574b136b0a42c63538e9ab970995cd418ba8e526400"),
 		common.Hex2Bytes("18fb432d3b859ec3a1803854e8cceea75d092e52d0d4a4398d13022496745a02"),
@@ -25,12 +24,12 @@ func TestReproduceTree(t *testing.T) {
 		common.Hex2Bytes("18fb432d3b859ec3a1803854e8cceea75d092e52d0d4a4398d13022496745a01"),
 	}
 
-	absentKeys := [][]byte{
+	absentKeys = [][]byte{
 		common.Hex2Bytes("318dea512b6f3237a2d4763cf49bf26de3b617fb0cabe38a97807a5549df4d03"),
 		common.Hex2Bytes("318dea512b6f3237a2d4763cf49bf26de3b617fb0cabe38a97807a5549df4d04"),
 	}
 
-	values := [][]byte{
+	values = [][]byte{
 		common.Hex2Bytes("320122e8584be00d000000000000000000000000000000000000000000000000"),
 		common.Hex2Bytes("0000000000000000000000000000000000000000000000000000000000000000"),
 		common.Hex2Bytes("0000000000000000000000000000000000000000000000000000000000000000"),
@@ -45,7 +44,10 @@ func TestReproduceTree(t *testing.T) {
 		common.Hex2Bytes("0000000000000000000000000000000000000000000000000000000000000000"),
 		common.Hex2Bytes("e703000000000000000000000000000000000000000000000000000000000000"),
 	}
+)
 
+// Ethereum's Verkle test
+func TestReproduceTree(t *testing.T) {
 	root := verkle.New()
 	kv := make(map[string][]byte)
 
