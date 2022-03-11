@@ -1,4 +1,4 @@
-package verkle
+package verklestore
 
 import (
 	"github.com/stretchr/testify/require"

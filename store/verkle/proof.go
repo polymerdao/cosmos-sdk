@@ -1,4 +1,4 @@
-package verkle
+package verklestore
 
 import (
 	"bytes"
@@ -17,7 +17,7 @@ const (
 
 // ProofOp defines an operation used for calculating Merkle root/verifying Verkle proof.
 // TODO: we should NOT have KeyVals in this struct, however there is no way to verify proof without rebuild the tree.
-//       Fix it when go-verkle is ready.
+//       Fix it when go-verkle is ready to rebuild the stateless tree from proof.
 type ProofOp struct {
 	KeyVals map[string][]byte
 	Key     []byte

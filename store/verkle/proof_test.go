@@ -1,4 +1,4 @@
-package verkle
+package verklestore
 
 import (
 	"golang.org/x/crypto/sha3"
