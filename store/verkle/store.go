@@ -53,7 +53,15 @@ func LoadStore(db dbm.DBReadWriter) *Store {
 		return nil
 	}
 	for iter.Next() {
-		err = tree.Insert(iter.Key(), iter.Value(), nil)
+		keyPath := sha3.Sum256(iter.Key())
+		var valuePath []byte
+		if len(iter.Value()) == 0 {
+			valuePath = zeroKey
+		} else {
+			v := sha3.Sum256(iter.Value())
+			valuePath = v[:]
+		}
+		err = tree.Insert(keyPath[:], valuePath[:], nil)
 		if err != nil {
 			return nil
 		}
@@ -96,10 +104,11 @@ func (s *Store) Get(key []byte) []byte {
 	}
 	// key doesn't exist
 	if valPath == nil {
-		return nil
+		return []byte{}
 	}
-	val, err := s.preimages.Get(valPath)
-	if err != nil {
+	val, err := s.values.Get(key)
+	valPath2 := sha3.Sum256(val)
+	if err != nil || !bytes.Equal(valPath2[:], valPath) {
 		panic(err)
 	}
 	return val
@@ -135,12 +144,11 @@ func (s *Store) Set(key []byte, value []byte) {
 	if err != nil {
 		panic(err)
 	}
-	err = s.values.Set(keyPath[:], valuePath[:])
+	err = s.values.Set(key, value)
 	if err != nil {
 		return
 	}
 	err = s.preimages.Set(keyPath[:], key)
-	err = s.preimages.Set(valuePath[:], value)
 	if err != nil {
 		return
 	}
@@ -158,7 +166,7 @@ func (s *Store) Delete(key []byte) {
 		// trying to delete non-existent leaf.
 		return
 	}
-	err = s.values.Set(path[:], zeroKey)
+	err = s.values.Set(key, []byte{})
 	if err != nil {
 		return
 	}
