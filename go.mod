@@ -61,7 +61,7 @@ require (
 
 require (
 	github.com/ethereum/go-ethereum v1.10.13
-	github.com/gballet/go-verkle v0.0.0-20220228192133-5773319d4d56
+	github.com/gballet/go-verkle v0.0.0-20220309192943-d9f613553c79
 )
 
 require (
@@ -76,7 +76,7 @@ require (
 	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/cosmos/ledger-go v0.9.2 // indirect
-	github.com/crate-crypto/go-ipa v0.0.0-20220120174240-fe21866d2ad5 // indirect
+	github.com/crate-crypto/go-ipa v0.0.0-20220309173511-816621cb2ec4 // indirect
 	github.com/danieljoos/wincred v1.0.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dgraph-io/badger/v2 v2.2007.4 // indirect
@@ -139,7 +139,7 @@ require (
 	golang.org/x/net v0.0.0-20211208012354-db4efeb81f4b // indirect
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8 // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect
-	golang.org/x/sys v0.0.0-20220224120231-95c6836cb0e7 // indirect
+	golang.org/x/sys v0.0.0-20220307203707-22a9840ba4d7 // indirect
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect

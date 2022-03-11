@@ -1,4 +1,4 @@
-package verkle
+package verklestore
 
 import (
 	"bytes"
@@ -9,67 +9,68 @@ import (
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/tendermint/tendermint/crypto/merkle"
 	tmmerkle "github.com/tendermint/tendermint/proto/tendermint/crypto"
-	"golang.org/x/crypto/sha3"
 )
 
 const (
 	ProofType = "ipa" // verkle_Pedersen_IPA
 )
 
-// ProofOp implements merkle.ProofOperator which is a layer for calculating
-// intermediate Merkle roots when a series of Merkle trees are chained together.
+// ProofOp defines an operation used for calculating Merkle root/verifying Verkle proof.
+// TODO: we should NOT have KeyVals in this struct, however there is no way to verify proof without rebuild the tree.
+//       Fix it when go-verkle is ready to rebuild the stateless tree from proof.
 type ProofOp struct {
-	Root   verkle.VerkleNode
-	Key    []byte
-	Proof  *verkle.ProofElements
-	Config *verkle.Config
+	KeyVals map[string][]byte
+	Key     []byte
+	Proof   *verkle.Proof
 }
 
 // NewProofOp returns a ProofOp for a Verkle Pedersen+IPA proof.
 // https://dankradfeist.de/ethereum/2021/07/27/inner-product-arguments.html
-func NewProofOp(root verkle.VerkleNode, key []byte, proof *verkle.ProofElements) *ProofOp {
-	cfg, err := verkle.GetConfig()
-	if err != nil {
-		panic(err)
-	}
+func NewProofOp(keyvals map[string][]byte, key []byte, proof *verkle.Proof) *ProofOp {
 	return &ProofOp{
-		Root:   root,
-		Key:    key,
-		Proof:  proof,
-		Config: cfg,
+		KeyVals: keyvals,
+		Key:     key,
+		Proof:   proof,
 	}
 }
 
-// Run takes leaf values from a tree and returns the Merkle
-// root for the corresponding tree. It takes and returns a list of bytes
-// to allow multiple leaves to be part of a single proof,
-// for instance in a range proof.
-// TODO: support multiproofs; need to modify tendermint api.
+// Run TODO: support multiproofs; may need to modify tendermint core.
 func (p *ProofOp) Run(args [][]byte) ([][]byte, error) {
-	var ret []byte
-	var err error
-	var proof *verkle.Proof
-	keyPath := sha3.Sum256(p.Key)
+	cfg, err := verkle.GetConfig()
+	root := verkle.New()
+	for key, val := range p.KeyVals {
+		err := root.Insert([]byte(key), val, nil)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	comm := root.ComputeCommitment().Bytes()
+	pe, _, _ := verkle.GetCommitmentsForMultiproof(root, [][]byte{p.Key})
+	if err != nil {
+		return nil, err
+	}
 	switch len(args) {
 	case 0: // non-membership proof
-		proof, _, _, _ = verkle.MakeVerkleMultiProof(p.Root, [][]byte{keyPath[:]}, map[string][]byte{string(zeroKey): zeroKey})
-		if !verkle.VerifyVerkleProof(proof, p.Proof.Cis, p.Proof.Zis, p.Proof.Yis, p.Config) {
+		val, err := root.Get(p.Key, nil)
+		if err != nil {
+			return nil, err
+		}
+		if !bytes.Equal(val, nil) || !verkle.VerifyVerkleProof(p.Proof, pe.Cis, pe.Zis, pe.Yis, cfg) {
 			return nil, sdkerrors.Wrapf(types.ErrInvalidProof, "proof did not verify absence of key: %s", p.Key)
 		}
 	case 1: // membership proof
-		valPath := sha3.Sum256(args[0])
-		proof, _, _, _ = verkle.MakeVerkleMultiProof(p.Root, [][]byte{keyPath[:]}, map[string][]byte{string(keyPath[:]): valPath[:]})
-		if !verkle.VerifyVerkleProof(proof, p.Proof.Cis, p.Proof.Zis, p.Proof.Yis, p.Config) {
+		val, err := root.Get(p.Key, nil)
+		if err != nil {
+			return nil, err
+		}
+		if !bytes.Equal(val, args[0]) || !verkle.VerifyVerkleProof(p.Proof, pe.Cis, pe.Zis, pe.Yis, cfg) {
 			return nil, sdkerrors.Wrapf(types.ErrInvalidProof, "proof did not verify existence of key %s with given value %x", p.Key, args[0])
 		}
 	default:
 		return nil, sdkerrors.Wrapf(types.ErrInvalidProof, "args must be length 0 or 1, got: %d", len(args))
 	}
-	ret, _, err = verkle.SerializeProof(proof)
-	if err != nil {
-		panic(err)
-	}
-	return [][]byte{ret}, nil
+	return [][]byte{comm[:]}, nil
 }
 
 func (p *ProofOp) GetKey() []byte {
@@ -79,10 +80,7 @@ func (p *ProofOp) GetKey() []byte {
 func (p *ProofOp) ProofOp() tmmerkle.ProofOp {
 	var data bytes.Buffer
 	enc := gob.NewEncoder(&data)
-	err := enc.Encode(p)
-	if err != nil {
-		return tmmerkle.ProofOp{}
-	}
+	enc.Encode(p)
 	return tmmerkle.ProofOp{
 		Type: ProofType,
 		Key:  p.Key,

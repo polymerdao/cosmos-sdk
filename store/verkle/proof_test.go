@@ -1,41 +1,38 @@
-package verkle
+package verklestore
 
 import (
+	"golang.org/x/crypto/sha3"
+	"testing"
+
 	"github.com/cosmos/cosmos-sdk/db/memdb"
 	"github.com/gballet/go-verkle"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/crypto/sha3"
-	"testing"
 )
 
 func TestProofOpInterface(t *testing.T) {
 	db := memdb.NewDB()
 	tree := NewStore(db.ReadWriter())
-	key := []byte("foo")
-	val := []byte("bar")
-	tree.Set(key, val)
+	keyPreimage := []byte("foo")
+	valPreimage := []byte("bar")
+	tree.Set(keyPreimage, valPreimage)
+
+	key32 := sha3.Sum256(keyPreimage)
+	val32 := sha3.Sum256(valPreimage)
+	key := key32[:]
+	val := val32[:]
+	keyval := map[string][]byte{string(key): val}
+
 	root := tree.GetRoot()
+	comm := root.ComputeCommitment().Bytes()
+	proof, _, _, _ := verkle.MakeVerkleMultiProof(root, [][]byte{key}, keyval)
 
-	keyPath := sha3.Sum256(key)
-	valPath := sha3.Sum256(val)
-
-	root.ComputeCommitment()
-	pe, _, _ := root.GetProofItems([][]byte{keyPath[:]})
-	proof, _, _, _ := verkle.MakeVerkleMultiProof(root, [][]byte{keyPath[:]}, map[string][]byte{string(keyPath[:]): valPath[:]})
-	config, err := verkle.GetConfig()
-	assert.NoError(t, err)
-	require.True(t, verkle.VerifyVerkleProof(proof, pe.Cis, pe.Zis, pe.Yis, config))
-
-	storeProofOp := NewProofOp(root, key, pe)
+	storeProofOp := NewProofOp(keyval, key, proof)
 	require.NotNil(t, storeProofOp)
 	// inclusion proof
 	r, err := storeProofOp.Run([][]byte{val})
 	assert.NoError(t, err)
-	assert.NotEmpty(t, r)
-	pf, err := verkle.DeserializeProof(r[0])
-	require.NoError(t, err)
-	require.True(t, verkle.VerifyVerkleProof(pf, pe.Cis, pe.Zis, pe.Yis, config))
+	assert.Equal(t, comm[:], r[0])
 
 	// inclusion proof - wrong value - should fail
 	r, err = storeProofOp.Run([][]byte{key})
@@ -46,6 +43,15 @@ func TestProofOpInterface(t *testing.T) {
 	r, err = storeProofOp.Run([][]byte{})
 	assert.Error(t, err)
 	assert.Empty(t, r)
+
+	// exclusion proof - should pass
+	key232 := sha3.Sum256([]byte{1, 2, 3})
+	key2 := key232[:]
+	proof2, _, _, _ := verkle.MakeVerkleMultiProof(root, [][]byte{key2}, map[string][]byte{string(key): val})
+	storeProofOp2 := NewProofOp(keyval, key2, proof2)
+	r, err = storeProofOp2.Run([][]byte{})
+	assert.NoError(t, err)
+	assert.Equal(t, comm[:], r[0])
 
 	// invalid request - should fail
 	r, err = storeProofOp.Run([][]byte{key, key})
@@ -69,5 +75,5 @@ func TestProofOpInterface(t *testing.T) {
 	r, err = decoded.Run([][]byte{val})
 	assert.NoError(t, err)
 	assert.NotEmpty(t, r)
-	assert.Equal(t, root, r[0])
+	assert.Equal(t, comm[:], r[0])
 }
