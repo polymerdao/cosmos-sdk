@@ -27,7 +27,7 @@ func TestProofOpInterface(t *testing.T) {
 	comm := root.ComputeCommitment().Bytes()
 	proof, _, _, _ := verkle.MakeVerkleMultiProof(root, [][]byte{key}, keyval)
 
-	storeProofOp := NewProofOp(keyval, key, proof)
+	storeProofOp := NewProofOp(tree.GetTreeKV(), key, proof)
 	require.NotNil(t, storeProofOp)
 	// inclusion proof
 	r, err := storeProofOp.Run([][]byte{val})

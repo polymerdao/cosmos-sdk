@@ -78,16 +78,54 @@ func LoadStore(db dbm.DBReadWriter) *Store {
 	}
 }
 
+func (s *Store) GetRootCommitment() []byte {
+	rootCommitment := s.tree.ComputeCommitment().Bytes()
+	return rootCommitment[:]
+}
+
 func (s *Store) GetRoot() verkle.VerkleNode {
 	return s.tree
 }
 
-func (s *Store) GetProof(_ []byte) (*tmcrypto.ProofOps, error) {
-	panic("not implemented")
+// GetTreeKV returns map of hash(kay) -> hash(value)
+// TODO: remove this function
+func (s *Store) GetTreeKV() map[string][]byte {
+	iter, err := s.values.Iterator(nil, nil)
+	if err != nil {
+		return nil
+	}
+	ret := make(map[string][]byte)
+	for iter.Next() {
+		keyPath := sha3.Sum256(iter.Key())
+		var valuePath []byte
+		if len(iter.Value()) == 0 {
+			valuePath = zeroKey
+		} else {
+			v := sha3.Sum256(iter.Value())
+			valuePath = v[:]
+		}
+		ret[string(keyPath[:])] = valuePath
+	}
+	err = iter.Close()
+	if err != nil {
+		panic(err)
+	}
+	return ret
 }
 
-func (s *Store) GetProofICS23(_ []byte) (*ics23.CommitmentProof, error) {
-	panic("not implemented")
+func (s *Store) GetProof(key []byte) (*tmcrypto.ProofOps, error) {
+	if len(key) == 0 {
+		return nil, errKeyEmpty
+	}
+	keyPath := sha3.Sum256(key)
+	kv := s.GetTreeKV()
+	proof, _, _, _ := verkle.MakeVerkleMultiProof(s.tree, [][]byte{keyPath[:]}, kv)
+	op := NewProofOp(kv, key, proof)
+	return &tmcrypto.ProofOps{Ops: []tmcrypto.ProofOp{op.ProofOp()}}, nil
+}
+
+func (s *Store) GetProofICS23(key []byte) (*ics23.CommitmentProof, error) {
+	return createIcs23Proof(s, key)
 }
 
 // BasicKVStore interface below:
