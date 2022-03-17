@@ -87,7 +87,7 @@ func (s *Store) GetRoot() verkle.VerkleNode {
 	return s.tree
 }
 
-// GetTreeKV returns map of hash(kay) -> hash(value)
+// GetTreeKV returns map of hash(key) -> hash(value)
 // TODO: remove this function
 func (s *Store) GetTreeKV() map[string][]byte {
 	iter, err := s.values.Iterator(nil, nil)

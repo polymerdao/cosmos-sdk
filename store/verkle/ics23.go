@@ -4,6 +4,8 @@
 package verklestore
 
 import (
+	"bytes"
+	"errors"
 	ics23 "github.com/confio/ics23/go"
 	"github.com/gballet/go-verkle"
 	"golang.org/x/crypto/sha3"
@@ -15,6 +17,9 @@ func createIcs23Proof(store *Store, key []byte) (*ics23.CommitmentProof, error) 
 	// TODO: should not use all KVs
 	kvs := store.GetTreeKV()
 	proof, _, _, _ := verkle.MakeVerkleMultiProof(store.tree, [][]byte{keyPath[:]}, kvs)
+	if len(proof.Keys) == 0 || bytes.Equal(key, proof.Keys[0]) {
+		return nil, errors.New("wrong key in verkle proof")
+	}
 	proofStr, _, err := verkle.SerializeProof(proof)
 	if err != nil {
 		return nil, err
@@ -22,6 +27,7 @@ func createIcs23Proof(store *Store, key []byte) (*ics23.CommitmentProof, error) 
 
 	var keys, vals [][]byte
 	for k, v := range kvs {
+		// TODO: This is just for trials till go-verkle supports proofKV
 		keys = append(keys, []byte(k))
 		vals = append(vals, v)
 	}
