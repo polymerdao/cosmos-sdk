@@ -162,3 +162,5 @@ replace github.com/gin-gonic/gin => github.com/gin-gonic/gin v1.7.0
 replace github.com/cosmos/cosmos-sdk/db => ./db
 
 retract v0.43.0
+
+replace github.com/confio/ics23/go => github.com/polymerdao/ics23/go v0.7.1-0.20220315231300-eae9032a2a2f
