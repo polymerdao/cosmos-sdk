@@ -145,12 +145,12 @@ func TestVerkleMultistoreSnapshot_Checksum(t *testing.T) {
 		chunkHashes []string
 	}{
 		{1, []string{
-			"b0635a30d94d56b6cd1073fbfa109fa90b194d0ff2397659b00934c844a1f6fb",
-			"8c32e05f312cf2dee6b7d2bdb41e1a2bb2372697f25504e676af1718245d8b63",
-			"05dfef0e32c34ef3900300f9de51f228d7fb204fa8f4e4d0d1529f083d122029",
-			"77d30aeeb427b0bdcedf3639adde1e822c15233d652782e171125280875aa492",
-			"c00c3801da889ea4370f0e647ffe1e291bd47f500e2a7269611eb4cc198b993f",
-			"6d565eb28776631f3e3e764decd53436c3be073a8a01fa5434afd539f9ae6eda",
+			"06a12007e2e994e4e3553c1dfdea1c6c2903f996d66d8086edc55782bd4d18ec",
+			"579fd438b23a4c4ebbe106c32a3c5ee9f94feafa1407741d9286e83914e7ab73",
+			"9ae0a08649eee41f32f21e67f16da3ed06bce9cef3c33dc271fa3db7c71e3559",
+			"00c41e1656eb6c2c905618fcbe774c22f44a68ea37a5bd58071e696e5c4a1370",
+			"1e95d0d1c333c0c7f448fc28efa40c632ee17790dfa2412ba5a7a70a4a96a290",
+			"9602921532e3f59ed393eb7f6e5eac039d6757ba97102327d483ed7680f7597d",
 		}},
 	}
 	for _, tc := range testcases {
@@ -239,19 +239,19 @@ func TestVerkleMultistoreSnapshotRestore(t *testing.T) {
 }
 
 func BenchmarkVerkleMultistoreSnapshot100K(b *testing.B) {
-	benchmarkMultistoreSnapshot(b, 10, 10000)
+	benchmarkVerkleMultistoreSnapshot(b, 10, 10000)
 }
 
 func BenchmarkVerkleMultistoreSnapshot1M(b *testing.B) {
-	benchmarkMultistoreSnapshot(b, 10, 100000)
+	benchmarkVerkleMultistoreSnapshot(b, 10, 100000)
 }
 
 func BenchmarkVerkleMultistoreSnapshotRestore100K(b *testing.B) {
-	benchmarkMultistoreSnapshotRestore(b, 10, 10000)
+	benchmarkVerkleMultistoreSnapshotRestore(b, 10, 10000)
 }
 
 func BenchmarkVerkleMultistoreSnapshotRestore1M(b *testing.B) {
-	benchmarkMultistoreSnapshotRestore(b, 10, 100000)
+	benchmarkVerkleMultistoreSnapshotRestore(b, 10, 100000)
 }
 
 func benchmarkVerkleMultistoreSnapshot(b *testing.B, stores int, storeKeys uint64) {

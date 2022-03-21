@@ -109,7 +109,7 @@ func (s *substore) ReverseIterator(start, end []byte) types.Iterator {
 
 // GetStoreType implements Store.
 func (s *substore) GetStoreType() types.StoreType {
-	return types.StoreTypePersistent
+	return s.root.schema[s.name]
 }
 
 func (s *substore) CacheWrap() types.CacheWrap {

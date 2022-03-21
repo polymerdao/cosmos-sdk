@@ -67,4 +67,9 @@ message SnapshotKVItem {
 // SnapshotSchema is an exported schema of smt store
 message SnapshotSchema{
   repeated bytes keys = 1;
+  enum Schema {
+    SMT = 0;
+    VERKLE = 1;
+  }
+  repeated Schema schemas = 2;
 }

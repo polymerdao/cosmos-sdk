@@ -194,6 +194,7 @@ func (s *Store) Set(key []byte, value []byte) {
 	if err != nil {
 		return
 	}
+	s.tree.ComputeCommitment()
 }
 
 // Delete deletes the key. Panics on nil key.
@@ -217,4 +218,5 @@ func (s *Store) Delete(key []byte) {
 	if err != nil {
 		return
 	}
+	s.tree.ComputeCommitment()
 }
