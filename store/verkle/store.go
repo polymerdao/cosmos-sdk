@@ -25,6 +25,11 @@ var (
 	errValueNil = errors.New("value is nil")
 )
 
+func Hash(value []byte) []byte {
+	tmp := sha3.Sum256(value)
+	return tmp[:]
+}
+
 // Store Implements types.KVStore and CommitKVStore.
 type Store struct {
 	tree   verkle.VerkleNode
@@ -53,15 +58,14 @@ func LoadStore(db dbm.DBReadWriter) *Store {
 		return nil
 	}
 	for iter.Next() {
-		keyPath := sha3.Sum256(iter.Key())
+		keyPath := Hash(iter.Key())
 		var valuePath []byte
 		if len(iter.Value()) == 0 {
 			valuePath = zeroKey
 		} else {
-			v := sha3.Sum256(iter.Value())
-			valuePath = v[:]
+			valuePath = Hash(iter.Value())
 		}
-		err = tree.Insert(keyPath[:], valuePath[:], nil)
+		err = tree.Insert(keyPath, valuePath, nil)
 		if err != nil {
 			return nil
 		}
@@ -71,6 +75,7 @@ func LoadStore(db dbm.DBReadWriter) *Store {
 		panic(err)
 	}
 
+	tree.ComputeCommitment()
 	return &Store{
 		tree:      tree,
 		values:    values,
@@ -96,15 +101,14 @@ func (s *Store) GetTreeKV() map[string][]byte {
 	}
 	ret := make(map[string][]byte)
 	for iter.Next() {
-		keyPath := sha3.Sum256(iter.Key())
+		keyPath := Hash(iter.Key())
 		var valuePath []byte
 		if len(iter.Value()) == 0 {
 			valuePath = zeroKey
 		} else {
-			v := sha3.Sum256(iter.Value())
-			valuePath = v[:]
+			valuePath = Hash(iter.Value())
 		}
-		ret[string(keyPath[:])] = valuePath
+		ret[string(keyPath)] = valuePath
 	}
 	err = iter.Close()
 	if err != nil {
@@ -117,9 +121,9 @@ func (s *Store) GetProof(key []byte) (*tmcrypto.ProofOps, error) {
 	if len(key) == 0 {
 		return nil, errKeyEmpty
 	}
-	keyPath := sha3.Sum256(key)
+	keyPath := Hash(key)
 	kv := s.GetTreeKV()
-	proof, _, _, _ := verkle.MakeVerkleMultiProof(s.tree, [][]byte{keyPath[:]}, kv)
+	proof, _, _, _ := verkle.MakeVerkleMultiProof(s.tree, [][]byte{keyPath}, kv)
 	op := NewProofOp(kv, key, proof)
 	return &tmcrypto.ProofOps{Ops: []tmcrypto.ProofOp{op.ProofOp()}}, nil
 }
@@ -135,8 +139,8 @@ func (s *Store) Get(key []byte) []byte {
 	if len(key) == 0 {
 		panic(errKeyEmpty)
 	}
-	keyPath := sha3.Sum256(key)
-	valPath, err := s.tree.Get(keyPath[:], nil)
+	keyPath := Hash(key)
+	valPath, err := s.tree.Get(keyPath, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -145,8 +149,8 @@ func (s *Store) Get(key []byte) []byte {
 		return []byte{}
 	}
 	val, err := s.values.Get(key)
-	valPath2 := sha3.Sum256(val)
-	if err != nil || !bytes.Equal(valPath2[:], valPath) {
+	valPath2 := Hash(val)
+	if err != nil || !bytes.Equal(valPath2, valPath) {
 		panic(err)
 	}
 	return val
@@ -157,8 +161,8 @@ func (s *Store) Has(key []byte) bool {
 	if len(key) == 0 {
 		panic(errKeyEmpty)
 	}
-	keyPath := sha3.Sum256(key)
-	valPath, err := s.tree.Get(keyPath[:], nil)
+	keyPath := Hash(key)
+	valPath, err := s.tree.Get(keyPath, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -176,9 +180,9 @@ func (s *Store) Set(key []byte, value []byte) {
 	if value == nil {
 		panic(errValueNil)
 	}
-	keyPath := sha3.Sum256(key)
-	valuePath := sha3.Sum256(value)
-	err := s.tree.Insert(keyPath[:], valuePath[:], nil)
+	keyPath := Hash(key)
+	valuePath := Hash(value)
+	err := s.tree.Insert(keyPath, valuePath, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -186,7 +190,7 @@ func (s *Store) Set(key []byte, value []byte) {
 	if err != nil {
 		return
 	}
-	err = s.preimages.Set(keyPath[:], key)
+	err = s.preimages.Set(keyPath, key)
 	if err != nil {
 		return
 	}
@@ -198,8 +202,8 @@ func (s *Store) Delete(key []byte) {
 	if len(key) == 0 {
 		panic(errKeyEmpty)
 	}
-	path := sha3.Sum256(key)
-	err := s.tree.Delete(path[:])
+	path := Hash(key)
+	err := s.tree.Delete(path)
 	if err != nil {
 		// trying to delete non-existent leaf.
 		return
@@ -209,7 +213,7 @@ func (s *Store) Delete(key []byte) {
 		return
 	}
 	// valuePath is not deleted in case there are duplicate values in the tree
-	err = s.preimages.Delete(path[:])
+	err = s.preimages.Delete(path)
 	if err != nil {
 		return
 	}

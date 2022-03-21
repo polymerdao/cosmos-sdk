@@ -38,11 +38,15 @@ type (
 
 // Re-export relevant constants, values and utility functions
 const (
-	StoreTypeMemory     = v1.StoreTypeMemory
-	StoreTypeTransient  = v1.StoreTypeTransient
-	StoreTypeDB         = v1.StoreTypeDB
-	StoreTypeSMT        = v1.StoreTypeSMT
-	StoreTypePersistent = v1.StoreTypePersistent
+	StoreTypeMemory           = v1.StoreTypeMemory
+	StoreTypeTransient        = v1.StoreTypeTransient
+	StoreTypeDB               = v1.StoreTypeDB
+	StoreTypeSMT              = v1.StoreTypeSMT
+	StoreTypePersistent       = v1.StoreTypePersistent
+	StoreTypeVerkle           = v1.StoreTypeVerkle
+	StoreTypeVerkleTransient  = v1.StoreTypeVerkleTransient
+	StoreTypeVerkleMemory     = v1.StoreTypeVerkleMemory
+	StoreTypeVerklePersistent = v1.StoreTypeVerklePersistent
 )
 
 var (
@@ -59,10 +63,12 @@ var (
 
 	ProofOpSMTCommitment          = v1.ProofOpSMTCommitment
 	ProofOpSimpleMerkleCommitment = v1.ProofOpSimpleMerkleCommitment
+	ProofOpVerkleCommitment       = v1.ProofOpVerkleCommitment
 
-	CommitmentOpDecoder = v1.CommitmentOpDecoder
-	ProofOpFromMap      = v1.ProofOpFromMap
-	NewSmtCommitmentOp  = v1.NewSmtCommitmentOp
+	CommitmentOpDecoder   = v1.CommitmentOpDecoder
+	ProofOpFromMap        = v1.ProofOpFromMap
+	NewSmtCommitmentOp    = v1.NewSmtCommitmentOp
+	NewVerkleCommitmentOp = v1.NewVerkleCommitmentOp
 )
 
 // BasicMultiStore defines a minimal interface for accessing root state.

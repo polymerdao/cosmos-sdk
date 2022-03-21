@@ -46,7 +46,11 @@ func (s *substore) Set(key, value []byte) {
 	if err != nil {
 		panic(err)
 	}
-	s.stateCommitmentStore.Set(key, value)
+	if useVerkleTree(s.root.schema[s.name]) {
+		s.verkleStateCommitmentStore.Set(key, value)
+	} else {
+		s.stateCommitmentStore.Set(key, value)
+	}
 	khash := sha256.Sum256(key)
 	err = s.indexBucket.Set(khash[:], key)
 	if err != nil {
@@ -60,7 +64,11 @@ func (s *substore) Delete(key []byte) {
 	s.root.mtx.Lock()
 	defer s.root.mtx.Unlock()
 
-	s.stateCommitmentStore.Delete(key)
+	if useVerkleTree(s.root.schema[s.name]) {
+		s.verkleStateCommitmentStore.Delete(key)
+	} else {
+		s.stateCommitmentStore.Delete(key)
+	}
 	_ = s.indexBucket.Delete(khash[:])
 	_ = s.dataBucket.Delete(key)
 }

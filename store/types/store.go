@@ -45,9 +45,10 @@ type Queryable interface {
 
 // StoreUpgrades defines a series of transformations to apply the multistore db upon load
 type StoreUpgrades struct {
-	Added   []string      `json:"added"`
-	Renamed []StoreRename `json:"renamed"`
-	Deleted []string      `json:"deleted"`
+	Added       []string      `json:"added"`
+	Renamed     []StoreRename `json:"renamed"`
+	Deleted     []string      `json:"deleted"`
+	AddedVerkle []string      `json:"added_verkle"`
 }
 
 // StoreRename defines a name change of a sub-store.
@@ -58,12 +59,12 @@ type StoreRename struct {
 	NewKey string `json:"new_key"`
 }
 
-// IsDeleted returns true if the given key should be added
+// IsAdded returns true if the given key should be added
 func (s *StoreUpgrades) IsAdded(key string) bool {
 	if s == nil {
 		return false
 	}
-	return tmstrings.StringInSlice(key, s.Added)
+	return tmstrings.StringInSlice(key, s.Added) || tmstrings.StringInSlice(key, s.AddedVerkle)
 }
 
 // IsDeleted returns true if the given key should be deleted
@@ -298,6 +299,10 @@ const (
 	StoreTypeMemory
 	StoreTypeSMT
 	StoreTypePersistent
+	StoreTypeVerkle           = 100
+	StoreTypeVerkleTransient  = 101
+	StoreTypeVerkleMemory     = 102
+	StoreTypeVerklePersistent = 103
 )
 
 func (st StoreType) String() string {
@@ -322,6 +327,18 @@ func (st StoreType) String() string {
 
 	case StoreTypePersistent:
 		return "StoreTypePersistent"
+
+	case StoreTypeVerkle:
+		return "StoreTypeVerkle"
+
+	case StoreTypeVerklePersistent:
+		return "StoreTypeVerklePersistent"
+
+	case StoreTypeVerkleMemory:
+		return "StoreTypeVerkleMemory"
+
+	case StoreTypeVerkleTransient:
+		return "StoreTypeVerkleTransient"
 	}
 
 	return "unknown store type"

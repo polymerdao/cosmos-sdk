@@ -1,8 +1,10 @@
 package multi
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	verklestore "github.com/cosmos/cosmos-sdk/store/verkle"
 	"io"
 	"math"
 	"strings"
@@ -101,11 +103,12 @@ type Store struct {
 }
 
 type substore struct {
-	root                 *Store
-	name                 string
-	dataBucket           dbm.DBReadWriter
-	indexBucket          dbm.DBReadWriter
-	stateCommitmentStore *smt.Store
+	root                       *Store
+	name                       string
+	dataBucket                 dbm.DBReadWriter
+	indexBucket                dbm.DBReadWriter
+	stateCommitmentStore       *smt.Store
+	verkleStateCommitmentStore *verklestore.Store
 }
 
 // Branched state
@@ -124,11 +127,12 @@ type viewStore struct {
 }
 
 type viewSubstore struct {
-	root                 *viewStore
-	name                 string
-	dataBucket           dbm.DBReader
-	indexBucket          dbm.DBReader
-	stateCommitmentStore *smt.Store
+	root                       *viewStore
+	name                       string
+	dataBucket                 dbm.DBReader
+	indexBucket                dbm.DBReader
+	stateCommitmentStore       *smt.Store
+	verkleStateCommitmentStore *verklestore.Store
 }
 
 // Builder type used to create a valid schema with no prefix conflicts
@@ -160,14 +164,19 @@ func DefaultStoreConfig() StoreConfig {
 	}
 }
 
+// Returns true if Verkle tree is used in store type
+func useVerkleTree(sst types.StoreType) bool {
+	return sst >= types.StoreTypeVerkle && sst <= types.StoreTypeVerklePersistent
+}
+
 // Returns true for valid store types for a MultiStore schema
 func validSubStoreType(sst types.StoreType) bool {
 	switch sst {
-	case types.StoreTypePersistent:
+	case types.StoreTypePersistent, types.StoreTypeVerklePersistent:
 		return true
-	case types.StoreTypeMemory:
+	case types.StoreTypeMemory, types.StoreTypeVerkleMemory:
 		return true
-	case types.StoreTypeTransient:
+	case types.StoreTypeTransient, types.StoreTypeVerkleTransient:
 		return true
 	default:
 		return false
@@ -360,7 +369,7 @@ func (pr *prefixRegistry) migrate(store *Store, upgrades types.StoreUpgrades) er
 		if err != nil {
 			return err
 		}
-		if sst != types.StoreTypePersistent {
+		if sst != types.StoreTypePersistent && sst != types.StoreTypeVerklePersistent {
 			return fmt.Errorf("prefix is for non-persistent substore: %v (%v)", key, sst)
 		}
 		pr.reserved = append(pr.reserved[:ix], pr.reserved[ix+1:]...)
@@ -393,12 +402,12 @@ func (pr *prefixRegistry) migrate(store *Store, upgrades types.StoreUpgrades) er
 		if err != nil {
 			return err
 		}
-		if sst != types.StoreTypePersistent {
+		if sst != types.StoreTypePersistent && sst != types.StoreTypeVerklePersistent {
 			return fmt.Errorf("prefix is for non-persistent substore: %v (%v)", rename.OldKey, sst)
 		}
 		pr.reserved = append(pr.reserved[:ix], pr.reserved[ix+1:]...)
 		delete(pr.StoreSchema, rename.OldKey)
-		err = pr.RegisterSubstore(rename.NewKey, types.StoreTypePersistent)
+		err = pr.RegisterSubstore(rename.NewKey, sst)
 		if err != nil {
 			return err
 		}
@@ -435,6 +444,13 @@ func (pr *prefixRegistry) migrate(store *Store, upgrades types.StoreUpgrades) er
 			return err
 		}
 	}
+
+	for _, key := range upgrades.AddedVerkle {
+		err := pr.RegisterSubstore(key, types.StoreTypeVerklePersistent)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -451,11 +467,11 @@ func (rs *Store) GetKVStore(skey types.StoreKey) types.KVStore {
 		panic(ErrStoreNotFound(key))
 	}
 	switch typ {
-	case types.StoreTypeMemory:
+	case types.StoreTypeMemory, types.StoreTypeVerkleMemory:
 		parent = rs.mem
-	case types.StoreTypeTransient:
+	case types.StoreTypeTransient, types.StoreTypeVerkleTransient:
 		parent = rs.tran
-	case types.StoreTypePersistent:
+	case types.StoreTypePersistent, types.StoreTypeVerklePersistent:
 	default:
 		panic(fmt.Errorf("StoreType not supported: %v", typ)) // should never happen
 	}
@@ -485,24 +501,37 @@ func (rs *Store) getSubstore(key string) (*substore, error) {
 	stateRW := prefixdb.NewPrefixReadWriter(rs.stateTxn, pfx)
 	stateCommitmentRW := prefixdb.NewPrefixReadWriter(rs.stateCommitmentTxn, pfx)
 	var stateCommitmentStore *smt.Store
+	var verkleStateCommitmentStore *verklestore.Store
+	useVerkle := useVerkleTree(rs.schema[key])
 
 	rootHash, err := stateRW.Get(substoreMerkleRootKey)
 	if err != nil {
 		return nil, err
 	}
-	if rootHash != nil {
-		stateCommitmentStore = loadSMT(stateCommitmentRW, rootHash)
+
+	if useVerkle {
+		if rootHash != nil {
+			verkleStateCommitmentStore = loadVerkle(stateCommitmentRW, rootHash)
+		} else {
+			db := prefixdb.NewPrefixReadWriter(stateCommitmentRW, smtPrefix)
+			verkleStateCommitmentStore = verklestore.NewStore(db)
+		}
 	} else {
-		smtdb := prefixdb.NewPrefixReadWriter(stateCommitmentRW, smtPrefix)
-		stateCommitmentStore = smt.NewStore(smtdb)
+		if rootHash != nil {
+			stateCommitmentStore = loadSMT(stateCommitmentRW, rootHash)
+		} else {
+			smtdb := prefixdb.NewPrefixReadWriter(stateCommitmentRW, smtPrefix)
+			stateCommitmentStore = smt.NewStore(smtdb)
+		}
 	}
 
 	return &substore{
-		root:                 rs,
-		name:                 key,
-		dataBucket:           prefixdb.NewPrefixReadWriter(stateRW, dataPrefix),
-		indexBucket:          prefixdb.NewPrefixReadWriter(stateRW, indexPrefix),
-		stateCommitmentStore: stateCommitmentStore,
+		root:                       rs,
+		name:                       key,
+		dataBucket:                 prefixdb.NewPrefixReadWriter(stateRW, dataPrefix),
+		indexBucket:                prefixdb.NewPrefixReadWriter(stateRW, indexPrefix),
+		stateCommitmentStore:       stateCommitmentStore,
+		verkleStateCommitmentStore: verkleStateCommitmentStore,
 	}, nil
 }
 
@@ -513,7 +542,11 @@ func (s *substore) refresh(rootHash []byte) {
 	stateCommitmentRW := prefixdb.NewPrefixReadWriter(s.root.stateCommitmentTxn, pfx)
 	s.dataBucket = prefixdb.NewPrefixReadWriter(stateRW, dataPrefix)
 	s.indexBucket = prefixdb.NewPrefixReadWriter(stateRW, indexPrefix)
-	s.stateCommitmentStore = loadSMT(stateCommitmentRW, rootHash)
+	if useVerkleTree(s.root.schema[s.name]) {
+		s.verkleStateCommitmentStore = loadVerkle(stateCommitmentRW, rootHash)
+	} else {
+		s.stateCommitmentStore = loadSMT(stateCommitmentRW, rootHash)
+	}
 }
 
 // Commit implements Committer.
@@ -569,7 +602,11 @@ func (s *Store) getMerkleRoots() (ret map[string][]byte, err error) {
 				return
 			}
 		}
-		ret[key] = sub.stateCommitmentStore.Root()
+		if useVerkleTree(sub.root.schema[sub.name]) {
+			ret[key] = sub.verkleStateCommitmentStore.GetRootCommitment()
+		} else {
+			ret[key] = sub.stateCommitmentStore.Root()
+		}
 	}
 	return
 }
@@ -804,6 +841,16 @@ func (rs *Store) Query(req abci.RequestQuery) (res abci.ResponseQuery) {
 func loadSMT(stateCommitmentTxn dbm.DBReadWriter, root []byte) *smt.Store {
 	smtdb := prefixdb.NewPrefixReadWriter(stateCommitmentTxn, smtPrefix)
 	return smt.LoadStore(smtdb, root)
+}
+
+func loadVerkle(stateCommitmentTxn dbm.DBReadWriter, root []byte) *verklestore.Store {
+	db := prefixdb.NewPrefixReadWriter(stateCommitmentTxn, smtPrefix)
+	store := verklestore.LoadStore(db)
+	if bytes.Equal(store.GetRootCommitment(), root) {
+		return store
+	} else {
+		panic("verkle tree loading error")
+	}
 }
 
 // Returns closest index and whether it's a match

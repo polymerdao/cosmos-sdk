@@ -12,7 +12,7 @@ func UpgradeStoreLoader(upgradeHeight int64, storeUpgrades *storetypes.StoreUpgr
 	return func(ms sdk.CommitMultiStore) error {
 		if upgradeHeight == ms.LastCommitID().Version+1 {
 			// Check if the current commit version and upgrade height matches
-			if len(storeUpgrades.Renamed) > 0 || len(storeUpgrades.Deleted) > 0 || len(storeUpgrades.Added) > 0 {
+			if len(storeUpgrades.Renamed) > 0 || len(storeUpgrades.Deleted) > 0 || len(storeUpgrades.Added) > 0 || len(storeUpgrades.AddedVerkle) > 0 {
 				return ms.LoadLatestVersionAndUpgrade(storeUpgrades)
 			}
 		}

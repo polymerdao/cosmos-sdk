@@ -2,6 +2,7 @@ package multi
 
 import (
 	"crypto/sha256"
+	verklestore "github.com/cosmos/cosmos-sdk/store/verkle"
 
 	"github.com/tendermint/tendermint/crypto/merkle"
 	tmcrypto "github.com/tendermint/tendermint/proto/tendermint/crypto"
@@ -30,10 +31,29 @@ func proveKey(s *smt.Store, key []byte) (*tmcrypto.ProofOps, error) {
 	return &ret, nil
 }
 
+// Prove commitment of key within an verkle store and return ProofOps
+func verkleProveKey(s *verklestore.Store, key []byte) (*tmcrypto.ProofOps, error) {
+	var ret tmcrypto.ProofOps
+	keyProof, err := s.GetProofICS23(key)
+	if err != nil {
+		return nil, err
+	}
+	hkey := verklestore.Hash(key)
+	ret.Ops = append(ret.Ops, types.NewSmtCommitmentOp(hkey, keyProof).ProofOp())
+	return &ret, nil
+}
+
 // GetProof returns ProofOps containing: a proof for the given key within this substore;
 // and a proof of the substore's existence within the MultiStore.
 func (s *viewSubstore) GetProof(key []byte) (*tmcrypto.ProofOps, error) {
-	ret, err := proveKey(s.stateCommitmentStore, key)
+	var ret *tmcrypto.ProofOps
+	var err error
+
+	if useVerkleTree(s.root.schema[s.name]) {
+		ret, err = verkleProveKey(s.verkleStateCommitmentStore, key)
+	} else {
+		ret, err = proveKey(s.stateCommitmentStore, key)
+	}
 	if err != nil {
 		return nil, err
 	}
