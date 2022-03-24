@@ -11,8 +11,8 @@ import (
 	tmcrypto "github.com/tendermint/tendermint/proto/tendermint/crypto"
 	"reflect"
 
-	types "github.com/cosmos/cosmos-sdk/store/v2"
-	"github.com/cosmos/cosmos-sdk/store/v2/smt"
+	types "github.com/cosmos/cosmos-sdk/store/v2alpha1"
+	"github.com/cosmos/cosmos-sdk/store/v2alpha1/smt"
 )
 
 // DefaultProofRuntime returns a ProofRuntime supporting SMT and simple merkle proofs.
