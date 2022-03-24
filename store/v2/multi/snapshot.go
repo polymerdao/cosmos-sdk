@@ -32,9 +32,14 @@ func (rs *Store) Snapshot(height uint64, protoWriter protoio.Writer) error {
 
 	// sending the snapshot store schema
 	var storeByteKeys [][]byte
+	var storeByteSchemas []snapshottypes.SnapshotSchema_Schema
 	for sKey := range vs.schema {
+		storeByteKeys = append(storeByteKeys, []byte(sKey))
 		if vs.schema[sKey] == storetypes.StoreTypePersistent {
-			storeByteKeys = append(storeByteKeys, []byte(sKey))
+			storeByteSchemas = append(storeByteSchemas, snapshottypes.SnapshotSchema_SMT)
+		}
+		if vs.schema[sKey] == storetypes.StoreTypeVerklePersistent {
+			storeByteSchemas = append(storeByteSchemas, snapshottypes.SnapshotSchema_VERKLE)
 		}
 	}
 
@@ -45,7 +50,8 @@ func (rs *Store) Snapshot(height uint64, protoWriter protoio.Writer) error {
 	err = protoWriter.WriteMsg(&snapshottypes.SnapshotItem{
 		Item: &snapshottypes.SnapshotItem_Schema{
 			Schema: &snapshottypes.SnapshotSchema{
-				Keys: storeByteKeys,
+				Keys:    storeByteKeys,
+				Schemas: storeByteSchemas,
 			},
 		},
 	})
@@ -125,8 +131,12 @@ loop:
 		case *snapshottypes.SnapshotItem_Schema:
 			receivedStoreSchema := make(StoreSchema, len(item.Schema.GetKeys()))
 			storeSchemaReceived = true
-			for _, sKey := range item.Schema.GetKeys() {
-				receivedStoreSchema[string(sKey)] = types.StoreTypePersistent
+			for i, sKey := range item.Schema.GetKeys() {
+				if item.Schema.GetSchemas()[i] == snapshottypes.SnapshotSchema_VERKLE {
+					receivedStoreSchema[string(sKey)] = types.StoreTypeVerklePersistent
+				} else {
+					receivedStoreSchema[string(sKey)] = types.StoreTypePersistent
+				}
 			}
 
 			if !rs.schema.equal(receivedStoreSchema) {

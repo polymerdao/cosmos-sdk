@@ -69,7 +69,7 @@ func (s *viewSubstore) ReverseIterator(start, end []byte) types.Iterator {
 
 // GetStoreType implements Store.
 func (s *viewSubstore) GetStoreType() types.StoreType {
-	return types.StoreTypePersistent
+	return s.root.schema[s.name]
 }
 
 func (st *viewSubstore) CacheWrap() types.CacheWrap {
@@ -86,7 +86,7 @@ func (st *viewSubstore) CacheWrapWithListeners(storeKey types.StoreKey, listener
 
 func (s *viewStore) getMerkleRoots() (ret map[string][]byte, err error) {
 	ret = map[string][]byte{}
-	for key, _ := range s.schema {
+	for key, storeType := range s.schema {
 		sub, has := s.substoreCache[key]
 		if !has {
 			sub, err = s.getSubstore(key)
@@ -94,7 +94,11 @@ func (s *viewStore) getMerkleRoots() (ret map[string][]byte, err error) {
 				return
 			}
 		}
-		ret[key] = sub.stateCommitmentStore.Root()
+		if useVerkleTree(storeType) {
+			ret[key] = sub.verkleStateCommitmentStore.GetRootCommitment()
+		} else {
+			ret[key] = sub.stateCommitmentStore.Root()
+		}
 	}
 	return
 }
@@ -168,11 +172,23 @@ func (vs *viewStore) getSubstore(key string) (*viewSubstore, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &viewSubstore{
-		root:                 vs,
-		name:                 key,
-		dataBucket:           prefixdb.NewPrefixReader(stateR, dataPrefix),
-		indexBucket:          prefixdb.NewPrefixReader(stateR, indexPrefix),
-		stateCommitmentStore: loadSMT(dbm.ReaderAsReadWriter(stateCommitmentR), rootHash),
-	}, nil
+	if useVerkleTree(vs.schema[key]) {
+		return &viewSubstore{
+			root:                       vs,
+			name:                       key,
+			dataBucket:                 prefixdb.NewPrefixReader(stateR, dataPrefix),
+			indexBucket:                prefixdb.NewPrefixReader(stateR, indexPrefix),
+			stateCommitmentStore:       nil,
+			verkleStateCommitmentStore: loadVerkle(dbm.ReaderAsReadWriter(stateCommitmentR), rootHash),
+		}, nil
+	} else {
+		return &viewSubstore{
+			root:                       vs,
+			name:                       key,
+			dataBucket:                 prefixdb.NewPrefixReader(stateR, dataPrefix),
+			indexBucket:                prefixdb.NewPrefixReader(stateR, indexPrefix),
+			stateCommitmentStore:       loadSMT(dbm.ReaderAsReadWriter(stateCommitmentR), rootHash),
+			verkleStateCommitmentStore: nil,
+		}, nil
+	}
 }

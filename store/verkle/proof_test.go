@@ -1,7 +1,6 @@
 package verklestore
 
 import (
-	"golang.org/x/crypto/sha3"
 	"testing"
 
 	"github.com/cosmos/cosmos-sdk/db/memdb"
@@ -17,10 +16,8 @@ func TestProofOpInterface(t *testing.T) {
 	valPreimage := []byte("bar")
 	tree.Set(keyPreimage, valPreimage)
 
-	key32 := sha3.Sum256(keyPreimage)
-	val32 := sha3.Sum256(valPreimage)
-	key := key32[:]
-	val := val32[:]
+	key := Hash(keyPreimage)
+	val := Hash(valPreimage)
 	keyval := map[string][]byte{string(key): val}
 
 	root := tree.GetRoot()
@@ -45,8 +42,7 @@ func TestProofOpInterface(t *testing.T) {
 	assert.Empty(t, r)
 
 	// exclusion proof - should pass
-	key232 := sha3.Sum256([]byte{1, 2, 3})
-	key2 := key232[:]
+	key2 := Hash([]byte{1, 2, 3})
 	proof2, _, _, _ := verkle.MakeVerkleMultiProof(root, [][]byte{key2}, map[string][]byte{string(key): val})
 	storeProofOp2 := NewProofOp(keyval, key2, proof2)
 	r, err = storeProofOp2.Run([][]byte{})

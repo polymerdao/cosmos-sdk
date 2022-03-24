@@ -16,6 +16,7 @@ const (
 	ProofOpIAVLCommitment         = "ics23:iavl"
 	ProofOpSimpleMerkleCommitment = "ics23:simple"
 	ProofOpSMTCommitment          = "ics23:smt"
+	ProofOpVerkleCommitment       = "ics23:verkle"
 )
 
 // CommitmentOp implements merkle.ProofOperator by wrapping an ics23 CommitmentProof
@@ -60,6 +61,15 @@ func NewSmtCommitmentOp(key []byte, proof *ics23.CommitmentProof) CommitmentOp {
 	}
 }
 
+func NewVerkleCommitmentOp(key []byte, proof *ics23.CommitmentProof) CommitmentOp {
+	return CommitmentOp{
+		Type:  ProofOpVerkleCommitment,
+		Spec:  nil, // TODO: not used here
+		Key:   key,
+		Proof: proof,
+	}
+}
+
 // CommitmentOpDecoder takes a merkle.ProofOp and attempts to decode it into a CommitmentOp ProofOperator
 // The proofOp.Data is just a marshalled CommitmentProof. The Key of the CommitmentOp is extracted
 // from the unmarshalled proof.
@@ -70,6 +80,7 @@ func CommitmentOpDecoder(pop tmmerkle.ProofOp) (merkle.ProofOperator, error) {
 		spec = ics23.IavlSpec
 	case ProofOpSimpleMerkleCommitment:
 		spec = ics23.TendermintSpec
+	case ProofOpVerkleCommitment: // TODO: not used
 	case ProofOpSMTCommitment:
 		spec = ics23.SmtSpec
 	default:

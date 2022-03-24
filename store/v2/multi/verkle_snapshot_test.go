@@ -22,20 +22,20 @@ import (
 	"github.com/cosmos/cosmos-sdk/store/types"
 )
 
-func multiStoreConfig(t *testing.T, stores int) StoreConfig {
+func verkleMultiStoreConfig(t *testing.T, stores int) StoreConfig {
 	opts := DefaultStoreConfig()
 	opts.Pruning = types.PruneNothing
 
 	for i := 0; i < stores; i++ {
 		sKey := types.NewKVStoreKey(fmt.Sprintf("store%d", i))
-		require.NoError(t, opts.RegisterSubstore(sKey.Name(), types.StoreTypePersistent))
+		require.NoError(t, opts.RegisterSubstore(sKey.Name(), types.StoreTypeVerklePersistent))
 	}
 
 	return opts
 }
 
-func newMultiStoreWithGeneratedData(t *testing.T, db dbm.DBConnection, stores int, storeKeys uint64) *Store {
-	cfg := multiStoreConfig(t, stores)
+func newVerkleMultiStoreWithGeneratedData(t *testing.T, db dbm.DBConnection, stores int, storeKeys uint64) *Store {
+	cfg := verkleMultiStoreConfig(t, stores)
 	store, err := NewStore(db, cfg)
 	require.NoError(t, err)
 	r := rand.New(rand.NewSource(49872768940)) // Fixed seed for deterministic tests
@@ -67,8 +67,8 @@ func newMultiStoreWithGeneratedData(t *testing.T, db dbm.DBConnection, stores in
 	return store
 }
 
-func newMultiStoreWithBasicData(t *testing.T, db dbm.DBConnection, stores int) *Store {
-	cfg := multiStoreConfig(t, stores)
+func newVerkleMultiStoreWithBasicData(t *testing.T, db dbm.DBConnection, stores int) *Store {
+	cfg := verkleMultiStoreConfig(t, stores)
 	store, err := NewStore(db, cfg)
 	require.NoError(t, err)
 
@@ -84,15 +84,15 @@ func newMultiStoreWithBasicData(t *testing.T, db dbm.DBConnection, stores int) *
 	return store
 }
 
-func newMultiStore(t *testing.T, db dbm.DBConnection, stores int) *Store {
-	cfg := multiStoreConfig(t, stores)
+func newVerkleMultiStore(t *testing.T, db dbm.DBConnection, stores int) *Store {
+	cfg := verkleMultiStoreConfig(t, stores)
 	store, err := NewStore(db, cfg)
 	require.NoError(t, err)
 	return store
 }
 
-func TestMultistoreSnapshot_Errors(t *testing.T) {
-	store := newMultiStoreWithBasicData(t, memdb.NewDB(), 4)
+func TestVerkleMultistoreSnapshot_Errors(t *testing.T) {
+	store := newVerkleMultiStoreWithBasicData(t, memdb.NewDB(), 4)
 	testcases := map[string]struct {
 		height     uint64
 		expectType error
@@ -113,8 +113,8 @@ func TestMultistoreSnapshot_Errors(t *testing.T) {
 	}
 }
 
-func TestMultistoreRestore_Errors(t *testing.T) {
-	store := newMultiStoreWithBasicData(t, memdb.NewDB(), 4)
+func TestVerkleMultistoreRestore_Errors(t *testing.T) {
+	store := newVerkleMultiStoreWithBasicData(t, memdb.NewDB(), 4)
 	testcases := map[string]struct {
 		height          uint64
 		format          uint32
@@ -136,8 +136,8 @@ func TestMultistoreRestore_Errors(t *testing.T) {
 	}
 }
 
-func TestMultistoreSnapshot_Checksum(t *testing.T) {
-	store := newMultiStoreWithGeneratedData(t, memdb.NewDB(), 5, 10000)
+func TestVerkleMultistoreSnapshot_Checksum(t *testing.T) {
+	store := newVerkleMultiStoreWithGeneratedData(t, memdb.NewDB(), 5, 10000)
 	version := uint64(store.LastCommitID().Version)
 
 	testcases := []struct {
@@ -145,12 +145,12 @@ func TestMultistoreSnapshot_Checksum(t *testing.T) {
 		chunkHashes []string
 	}{
 		{1, []string{
-			"8b886c321630b6c016cd29c6484157c4349cedd24314d383d444bfabbafa0b98",
+			"06a12007e2e994e4e3553c1dfdea1c6c2903f996d66d8086edc55782bd4d18ec",
 			"579fd438b23a4c4ebbe106c32a3c5ee9f94feafa1407741d9286e83914e7ab73",
 			"9ae0a08649eee41f32f21e67f16da3ed06bce9cef3c33dc271fa3db7c71e3559",
 			"00c41e1656eb6c2c905618fcbe774c22f44a68ea37a5bd58071e696e5c4a1370",
 			"1e95d0d1c333c0c7f448fc28efa40c632ee17790dfa2412ba5a7a70a4a96a290",
-			"5a28f35061e30b36c269f29c4f8503202b552296fe62d6404c9bf69331a3b970",
+			"9602921532e3f59ed393eb7f6e5eac039d6757ba97102327d483ed7680f7597d",
 		}},
 	}
 	for _, tc := range testcases {
@@ -177,9 +177,9 @@ func TestMultistoreSnapshot_Checksum(t *testing.T) {
 	}
 }
 
-func TestMultistoreSnapshotRestore(t *testing.T) {
-	source := newMultiStoreWithGeneratedData(t, memdb.NewDB(), 3, 4)
-	target := newMultiStore(t, memdb.NewDB(), 3)
+func TestVerkleMultistoreSnapshotRestore(t *testing.T) {
+	source := newVerkleMultiStoreWithGeneratedData(t, memdb.NewDB(), 3, 4)
+	target := newVerkleMultiStore(t, memdb.NewDB(), 3)
 	require.Equal(t, source.LastCommitID().Version, int64(1))
 	version := uint64(source.LastCommitID().Version)
 	// check for target store restore
@@ -223,7 +223,7 @@ func TestMultistoreSnapshotRestore(t *testing.T) {
 	}
 
 	// checking snapshot restoring for store with existed schema and without existing versions
-	target3 := newMultiStore(t, memdb.NewDB(), 4)
+	target3 := newVerkleMultiStore(t, memdb.NewDB(), 4)
 	chunks3 := make(chan io.ReadCloser, 100)
 	go func() {
 		streamWriter3 := snapshots.NewStreamWriter(chunks3)
@@ -238,35 +238,35 @@ func TestMultistoreSnapshotRestore(t *testing.T) {
 	require.Error(t, err)
 }
 
-func BenchmarkMultistoreSnapshot100K(b *testing.B) {
-	benchmarkMultistoreSnapshot(b, 10, 10000)
+func BenchmarkVerkleMultistoreSnapshot100K(b *testing.B) {
+	benchmarkVerkleMultistoreSnapshot(b, 10, 10000)
 }
 
-func BenchmarkMultistoreSnapshot1M(b *testing.B) {
-	benchmarkMultistoreSnapshot(b, 10, 100000)
+func BenchmarkVerkleMultistoreSnapshot1M(b *testing.B) {
+	benchmarkVerkleMultistoreSnapshot(b, 10, 100000)
 }
 
-func BenchmarkMultistoreSnapshotRestore100K(b *testing.B) {
-	benchmarkMultistoreSnapshotRestore(b, 10, 10000)
+func BenchmarkVerkleMultistoreSnapshotRestore100K(b *testing.B) {
+	benchmarkVerkleMultistoreSnapshotRestore(b, 10, 10000)
 }
 
-func BenchmarkMultistoreSnapshotRestore1M(b *testing.B) {
-	benchmarkMultistoreSnapshotRestore(b, 10, 100000)
+func BenchmarkVerkleMultistoreSnapshotRestore1M(b *testing.B) {
+	benchmarkVerkleMultistoreSnapshotRestore(b, 10, 100000)
 }
 
-func benchmarkMultistoreSnapshot(b *testing.B, stores int, storeKeys uint64) {
+func benchmarkVerkleMultistoreSnapshot(b *testing.B, stores int, storeKeys uint64) {
 	b.Skip("Noisy with slow setup time, please see https://github.com/cosmos/cosmos-sdk/issues/8855.")
 
 	b.ReportAllocs()
 	b.StopTimer()
-	source := newMultiStoreWithGeneratedData(nil, memdb.NewDB(), stores, storeKeys)
+	source := newVerkleMultiStoreWithGeneratedData(nil, memdb.NewDB(), stores, storeKeys)
 
 	version := source.LastCommitID().Version
 	require.EqualValues(b, 1, version)
 	b.StartTimer()
 
 	for i := 0; i < b.N; i++ {
-		target := newMultiStore(nil, memdb.NewDB(), stores)
+		target := newVerkleMultiStore(nil, memdb.NewDB(), stores)
 		require.EqualValues(b, 0, target.LastCommitID().Version)
 
 		chunks := make(chan io.ReadCloser)
@@ -285,18 +285,18 @@ func benchmarkMultistoreSnapshot(b *testing.B, stores int, storeKeys uint64) {
 	}
 }
 
-func benchmarkMultistoreSnapshotRestore(b *testing.B, stores int, storeKeys uint64) {
+func benchmarkVerkleMultistoreSnapshotRestore(b *testing.B, stores int, storeKeys uint64) {
 	b.Skip("Noisy with slow setup time, please see https://github.com/cosmos/cosmos-sdk/issues/8855.")
 
 	b.ReportAllocs()
 	b.StopTimer()
-	source := newMultiStoreWithGeneratedData(nil, memdb.NewDB(), stores, storeKeys)
+	source := newVerkleMultiStoreWithGeneratedData(nil, memdb.NewDB(), stores, storeKeys)
 	version := uint64(source.LastCommitID().Version)
 	require.EqualValues(b, 1, version)
 	b.StartTimer()
 
 	for i := 0; i < b.N; i++ {
-		target := newMultiStore(nil, memdb.NewDB(), stores)
+		target := newVerkleMultiStore(nil, memdb.NewDB(), stores)
 		require.EqualValues(b, 0, target.LastCommitID().Version)
 
 		chunks := make(chan io.ReadCloser)
