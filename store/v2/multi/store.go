@@ -41,10 +41,11 @@ var (
 	contentPrefix = []byte{2} // Prefix for store contents
 
 	// Per-substore prefixes
-	substoreMerkleRootKey = []byte{0} // Key for root hashes of Merkle trees
-	dataPrefix            = []byte{1} // Prefix for state mappings
-	indexPrefix           = []byte{2} // Prefix for Store reverse index
-	smtPrefix             = []byte{3} // Prefix for SMT data
+	substoreMerkleRootKey = []byte{0}   // Key for root hashes of Merkle trees
+	dataPrefix            = []byte{1}   // Prefix for state mappings
+	indexPrefix           = []byte{2}   // Prefix for Store reverse index
+	smtPrefix             = []byte{3}   // Prefix for SMT data
+	verklePrefix          = []byte{100} // Prefix for Verkle data
 
 	ErrVersionDoesNotExist = errors.New("version does not exist")
 	ErrMaximumHeight       = errors.New("maximum block height reached")
@@ -512,7 +513,7 @@ func (rs *Store) getSubstore(key string) (*substore, error) {
 		if rootHash != nil {
 			verkleStateCommitmentStore = loadVerkle(stateCommitmentRW, rootHash)
 		} else {
-			db := prefixdb.NewPrefixReadWriter(stateCommitmentRW, smtPrefix)
+			db := prefixdb.NewPrefixReadWriter(stateCommitmentRW, verklePrefix)
 			verkleStateCommitmentStore = verklestore.NewStore(db)
 		}
 	} else {
@@ -843,7 +844,7 @@ func loadSMT(stateCommitmentTxn dbm.DBReadWriter, root []byte) *smt.Store {
 }
 
 func loadVerkle(stateCommitmentTxn dbm.DBReadWriter, root []byte) *verklestore.Store {
-	db := prefixdb.NewPrefixReadWriter(stateCommitmentTxn, smtPrefix)
+	db := prefixdb.NewPrefixReadWriter(stateCommitmentTxn, verklePrefix)
 	store := verklestore.LoadStore(db)
 	//if bytes.Equal(store.GetRootCommitment(), root) {
 	return store
