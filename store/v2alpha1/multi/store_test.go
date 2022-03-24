@@ -13,27 +13,42 @@ import (
 	codecTypes "github.com/cosmos/cosmos-sdk/codec/types"
 	dbm "github.com/cosmos/cosmos-sdk/db"
 	"github.com/cosmos/cosmos-sdk/db/memdb"
-	types "github.com/cosmos/cosmos-sdk/store/v2"
+	types "github.com/cosmos/cosmos-sdk/store/v2alpha1"
 	"github.com/cosmos/cosmos-sdk/types/kv"
 )
 
-func verkleSimpleStoreConfig(t *testing.T) StoreConfig {
+var (
+	cacheSize = 100
+	alohaData = map[string]string{
+		"hello": "goodbye",
+		"aloha": "shalom",
+	}
+	skey_1  = types.NewKVStoreKey("store1")
+	skey_2  = types.NewKVStoreKey("store2")
+	skey_3  = types.NewKVStoreKey("store3")
+	skey_4  = types.NewKVStoreKey("store4")
+	skey_1b = types.NewKVStoreKey("store1b")
+	skey_2b = types.NewKVStoreKey("store2b")
+	skey_3b = types.NewKVStoreKey("store3b")
+)
+
+func simpleStoreConfig(t *testing.T) StoreConfig {
 	opts := DefaultStoreConfig()
-	require.NoError(t, opts.RegisterSubstore(skey_1.Name(), types.StoreTypeVerklePersistent))
+	require.NoError(t, opts.RegisterSubstore(skey_1.Name(), types.StoreTypePersistent))
 	return opts
 }
 
-func verkleStoreConfig123(t *testing.T) StoreConfig {
+func storeConfig123(t *testing.T) StoreConfig {
 	opts := DefaultStoreConfig()
 	opts.Pruning = types.PruneNothing
-	require.NoError(t, opts.RegisterSubstore(skey_1.Name(), types.StoreTypeVerklePersistent))
+	require.NoError(t, opts.RegisterSubstore(skey_1.Name(), types.StoreTypePersistent))
 	require.NoError(t, opts.RegisterSubstore(skey_2.Name(), types.StoreTypePersistent))
-	require.NoError(t, opts.RegisterSubstore(skey_3.Name(), types.StoreTypeVerklePersistent))
+	require.NoError(t, opts.RegisterSubstore(skey_3.Name(), types.StoreTypePersistent))
 	return opts
 }
 
-func verkleNewSubStoreWithData(t *testing.T, db dbm.DBConnection, storeData map[string]string) (*Store, types.KVStore) {
-	root, err := NewStore(db, verkleSimpleStoreConfig(t))
+func newSubStoreWithData(t *testing.T, db dbm.DBConnection, storeData map[string]string) (*Store, types.KVStore) {
+	root, err := NewStore(db, simpleStoreConfig(t))
 	require.NoError(t, err)
 
 	store := root.GetKVStore(skey_1)
@@ -43,8 +58,8 @@ func verkleNewSubStoreWithData(t *testing.T, db dbm.DBConnection, storeData map[
 	return root, store
 }
 
-func TestVerkleGetSetHasDelete(t *testing.T) {
-	_, store := verkleNewSubStoreWithData(t, memdb.NewDB(), alohaData)
+func TestGetSetHasDelete(t *testing.T) {
+	_, store := newSubStoreWithData(t, memdb.NewDB(), alohaData)
 	key := "hello"
 
 	exists := store.Has([]byte(key))
@@ -76,10 +91,10 @@ func TestVerkleGetSetHasDelete(t *testing.T) {
 	}, "Set() when index fails should panic")
 }
 
-func TestVerkleConstructors(t *testing.T) {
+func TestConstructors(t *testing.T) {
 	db := memdb.NewDB()
 
-	store, err := NewStore(db, verkleSimpleStoreConfig(t))
+	store, err := NewStore(db, simpleStoreConfig(t))
 	require.NoError(t, err)
 	_ = store.GetKVStore(skey_1)
 	store.Commit()
@@ -100,27 +115,27 @@ func TestVerkleConstructors(t *testing.T) {
 	})
 
 	db = memdb.NewDB()
-	verkledb := memdb.NewDB()
+	merkledb := memdb.NewDB()
 	w := db.Writer()
 	t.Run("can't use a DB with open writers", func(t *testing.T) {
 		store, err = NewStore(db, DefaultStoreConfig())
 		require.Error(t, err)
 		w.Discard()
-		w = verkledb.Writer()
-		store, err = NewStore(db, StoreConfig{StateCommitmentDB: verkledb})
+		w = merkledb.Writer()
+		store, err = NewStore(db, StoreConfig{StateCommitmentDB: merkledb})
 		require.Error(t, err)
 		w.Discard()
 	})
 
 	t.Run("can't use DBs with different version history", func(t *testing.T) {
-		verkledb.SaveNextVersion()
-		store, err = NewStore(db, StoreConfig{StateCommitmentDB: verkledb})
+		merkledb.SaveNextVersion()
+		store, err = NewStore(db, StoreConfig{StateCommitmentDB: merkledb})
 		require.Error(t, err)
 	})
-	verkledb.Close()
+	merkledb.Close()
 
 	t.Run("can't load existing store if we can't access root hash", func(t *testing.T) {
-		store, err = NewStore(db, verkleSimpleStoreConfig(t))
+		store, err = NewStore(db, simpleStoreConfig(t))
 		require.NoError(t, err)
 		store.Commit()
 		require.NoError(t, store.Close())
@@ -139,8 +154,8 @@ func TestVerkleConstructors(t *testing.T) {
 	})
 }
 
-func TestVerkleIterators(t *testing.T) {
-	_, store := verkleNewSubStoreWithData(t, memdb.NewDB(), map[string]string{
+func TestIterators(t *testing.T) {
+	_, store := newSubStoreWithData(t, memdb.NewDB(), map[string]string{
 		string([]byte{0x00}):       "0",
 		string([]byte{0x00, 0x00}): "0 0",
 		string([]byte{0x00, 0x01}): "0 1",
@@ -200,7 +215,7 @@ func TestVerkleIterators(t *testing.T) {
 	require.Panics(t, func() { store.ReverseIterator(nil, []byte{}) }, "Iterator(empty key) should panic")
 }
 
-func TestVerkleCommit(t *testing.T) {
+func TestCommit(t *testing.T) {
 	testBasic := func(opts StoreConfig) {
 		db := memdb.NewDB()
 		store, err := NewStore(db, opts)
@@ -218,8 +233,7 @@ func TestVerkleCommit(t *testing.T) {
 		// Hash of emptied store is same as new store
 		s1.Delete([]byte{0})
 		idEmptied := store.Commit()
-		// The value is set to zero instead of deleting, so the root commitment is no longer the same
-		require.NotEqual(t, idNew.Hash, idEmptied.Hash)
+		require.Equal(t, idNew.Hash, idEmptied.Hash)
 
 		previd := idOne
 		for i := byte(1); i < 5; i++ {
@@ -232,12 +246,12 @@ func TestVerkleCommit(t *testing.T) {
 			require.NotEqual(t, previd.Version, id.Version)
 		}
 	}
-	basicOpts := verkleSimpleStoreConfig(t)
+	basicOpts := simpleStoreConfig(t)
 	basicOpts.Pruning = types.PruneNothing
-	t.Run("sanity tests for Verkle commitment", func(t *testing.T) {
+	t.Run("sanity tests for Merkle hashing", func(t *testing.T) {
 		testBasic(basicOpts)
 	})
-	t.Run("sanity tests for Verkle commitment with separate DBs", func(t *testing.T) {
+	t.Run("sanity tests for Merkle hashing with separate DBs", func(t *testing.T) {
 		basicOpts.StateCommitmentDB = memdb.NewDB()
 		testBasic(basicOpts)
 	})
@@ -271,7 +285,7 @@ func TestVerkleCommit(t *testing.T) {
 		require.NoError(t, store.Close())
 	}
 
-	opts := verkleSimpleStoreConfig(t)
+	opts := simpleStoreConfig(t)
 	opts.Pruning = types.PruneNothing
 
 	// Ensure Store's commit is rolled back in each failure case...
@@ -309,7 +323,7 @@ func TestVerkleCommit(t *testing.T) {
 		testFailedCommit(t, store, nil, opts)
 	})
 
-	opts = verkleSimpleStoreConfig(t)
+	opts = simpleStoreConfig(t)
 	t.Run("recover after stateDB.Versions error triggers failure", func(t *testing.T) {
 		db := memdb.NewDB()
 		store, err := NewStore(db, opts)
@@ -344,7 +358,7 @@ func TestVerkleCommit(t *testing.T) {
 	})
 
 	t.Run("first commit version matches InitialVersion", func(t *testing.T) {
-		opts = verkleSimpleStoreConfig(t)
+		opts = simpleStoreConfig(t)
 		opts.InitialVersion = 5
 		opts.Pruning = types.PruneNothing
 		opts.StateCommitmentDB = memdb.NewDB()
@@ -354,14 +368,14 @@ func TestVerkleCommit(t *testing.T) {
 	})
 
 	// test improbable failures to fill out test coverage
-	opts = verkleSimpleStoreConfig(t)
+	opts = simpleStoreConfig(t)
 	store, err := NewStore(memdb.NewDB(), opts)
 	require.NoError(t, err)
 	store.Commit()
 	store.stateDB = dbVersionsFails{store.stateDB}
 	require.Panics(t, func() { store.LastCommitID() })
 
-	opts = verkleSimpleStoreConfig(t)
+	opts = simpleStoreConfig(t)
 	opts.StateCommitmentDB = memdb.NewDB()
 	store, err = NewStore(memdb.NewDB(), opts)
 	require.NoError(t, err)
@@ -370,7 +384,15 @@ func TestVerkleCommit(t *testing.T) {
 	require.Panics(t, func() { store.LastCommitID() })
 }
 
-func TestVerklePruning(t *testing.T) {
+func sliceToSet(slice []uint64) map[uint64]struct{} {
+	res := make(map[uint64]struct{})
+	for _, x := range slice {
+		res[x] = struct{}{}
+	}
+	return res
+}
+
+func TestPruning(t *testing.T) {
 	// Save versions up to 10 and verify pruning at final commit
 	testCases := []struct {
 		types.PruningOptions
@@ -384,7 +406,7 @@ func TestVerklePruning(t *testing.T) {
 
 	for tci, tc := range testCases {
 		dbs := []dbm.DBConnection{memdb.NewDB(), memdb.NewDB()}
-		opts := verkleSimpleStoreConfig(t)
+		opts := simpleStoreConfig(t)
 		opts.Pruning = tc.PruningOptions
 		opts.StateCommitmentDB = dbs[1]
 		store, err := NewStore(dbs[0], opts)
@@ -420,7 +442,7 @@ func TestVerklePruning(t *testing.T) {
 	}
 
 	db := memdb.NewDB()
-	opts := verkleSimpleStoreConfig(t)
+	opts := simpleStoreConfig(t)
 	opts.Pruning = types.PruningOptions{0, 10}
 	store, err := NewStore(db, opts)
 	require.NoError(t, err)
@@ -448,7 +470,9 @@ func TestVerklePruning(t *testing.T) {
 	}
 }
 
-func TestVerkleQuery(t *testing.T) {
+func queryPath(skey types.StoreKey, endp string) string { return "/" + skey.Name() + endp }
+
+func TestQuery(t *testing.T) {
 	k1, v1 := []byte("k1"), []byte("v1")
 	k2, v2 := []byte("k2"), []byte("v2")
 	v3 := []byte("v3")
@@ -477,7 +501,7 @@ func TestVerkleQuery(t *testing.T) {
 	valExpSub2, err := KVs2.Marshal()
 	require.NoError(t, err)
 
-	store, err := NewStore(memdb.NewDB(), verkleSimpleStoreConfig(t))
+	store, err := NewStore(memdb.NewDB(), simpleStoreConfig(t))
 	require.NoError(t, err)
 	cid := store.Commit()
 	ver := cid.Version
@@ -551,7 +575,7 @@ func TestVerkleQuery(t *testing.T) {
 	})
 
 	// querying an empty store will fail
-	store2, err := NewStore(memdb.NewDB(), verkleSimpleStoreConfig(t))
+	store2, err := NewStore(memdb.NewDB(), simpleStoreConfig(t))
 	require.NoError(t, err)
 	qres = store2.Query(queryHeight0)
 	require.True(t, qres.IsErr())
@@ -606,7 +630,7 @@ func TestVerkleQuery(t *testing.T) {
 		testProve()
 		store.Close()
 
-		opts := verkleSimpleStoreConfig(t)
+		opts := simpleStoreConfig(t)
 		opts.StateCommitmentDB = memdb.NewDB()
 		store, err = NewStore(memdb.NewDB(), opts)
 		require.NoError(t, err)
@@ -617,24 +641,23 @@ func TestVerkleQuery(t *testing.T) {
 	})
 }
 
-func TestVerkleStoreConfig(t *testing.T) {
+func TestStoreConfig(t *testing.T) {
 	opts := DefaultStoreConfig()
 	// Fail with invalid types
 	require.Error(t, opts.RegisterSubstore(skey_1.Name(), types.StoreTypeDB))
 	require.Error(t, opts.RegisterSubstore(skey_1.Name(), types.StoreTypeSMT))
-	require.Error(t, opts.RegisterSubstore(skey_1.Name(), types.StoreTypeVerkle))
 	// Ensure that no prefix conflicts are allowed
-	require.NoError(t, opts.RegisterSubstore(skey_1.Name(), types.StoreTypeVerklePersistent))
-	require.NoError(t, opts.RegisterSubstore(skey_2.Name(), types.StoreTypeVerkleMemory))
-	require.NoError(t, opts.RegisterSubstore(skey_3b.Name(), types.StoreTypeVerkleTransient))
-	require.Error(t, opts.RegisterSubstore(skey_1b.Name(), types.StoreTypeVerklePersistent))
+	require.NoError(t, opts.RegisterSubstore(skey_1.Name(), types.StoreTypePersistent))
+	require.NoError(t, opts.RegisterSubstore(skey_2.Name(), types.StoreTypeMemory))
+	require.NoError(t, opts.RegisterSubstore(skey_3b.Name(), types.StoreTypeTransient))
+	require.Error(t, opts.RegisterSubstore(skey_1b.Name(), types.StoreTypePersistent))
 	require.Error(t, opts.RegisterSubstore(skey_2b.Name(), types.StoreTypePersistent))
 	require.Error(t, opts.RegisterSubstore(skey_3.Name(), types.StoreTypePersistent))
 }
 
-func TestVerkleMultiStoreBasic(t *testing.T) {
+func TestMultiStoreBasic(t *testing.T) {
 	opts := DefaultStoreConfig()
-	err := opts.RegisterSubstore(skey_1.Name(), types.StoreTypeVerklePersistent)
+	err := opts.RegisterSubstore(skey_1.Name(), types.StoreTypePersistent)
 	require.NoError(t, err)
 	db := memdb.NewDB()
 	store, err := NewStore(db, opts)
@@ -650,9 +673,9 @@ func TestVerkleMultiStoreBasic(t *testing.T) {
 	require.Equal(t, []byte(nil), val)
 }
 
-func TestVerkleGetVersion(t *testing.T) {
+func TestGetVersion(t *testing.T) {
 	db := memdb.NewDB()
-	opts := verkleStoreConfig123(t)
+	opts := storeConfig123(t)
 	store, err := NewStore(db, opts)
 	require.NoError(t, err)
 
@@ -685,10 +708,9 @@ func TestVerkleGetVersion(t *testing.T) {
 	require.Equal(t, []byte{0}, subview.Get([]byte{0}))
 }
 
-func TestVerkleMultiStoreMigration(t *testing.T) {
-	skey_5 := types.NewKVStoreKey("store5")
+func TestMultiStoreMigration(t *testing.T) {
 	db := memdb.NewDB()
-	opts := verkleStoreConfig123(t)
+	opts := storeConfig123(t)
 	store, err := NewStore(db, opts)
 	require.NoError(t, err)
 
@@ -728,14 +750,13 @@ func TestVerkleMultiStoreMigration(t *testing.T) {
 	t.Run("basic migration", func(t *testing.T) {
 		// now, let's load with upgrades...
 		opts.Upgrades = []types.StoreUpgrades{
-			{
+			types.StoreUpgrades{
 				Added: []string{skey_4.Name()},
 				Renamed: []types.StoreRename{{
 					OldKey: skey_2.Name(),
 					NewKey: skey_2b.Name(),
 				}},
-				Deleted:     []string{skey_3.Name()},
-				AddedVerkle: []string{skey_5.Name()},
+				Deleted: []string{skey_3.Name()},
 			},
 		}
 		store, err = NewStore(db, opts)
@@ -777,18 +798,16 @@ func TestVerkleMultiStoreMigration(t *testing.T) {
 
 	t.Run("reload after migrations", func(t *testing.T) {
 		// fail to load the migrated store with the old schema
-		store, err = NewStore(db, verkleStoreConfig123(t))
+		store, err = NewStore(db, storeConfig123(t))
 		require.Error(t, err)
 
 		// pass in a schema reflecting the migrations
 		migratedOpts := DefaultStoreConfig()
-		err = migratedOpts.RegisterSubstore(skey_1.Name(), types.StoreTypeVerklePersistent)
+		err = migratedOpts.RegisterSubstore(skey_1.Name(), types.StoreTypePersistent)
 		require.NoError(t, err)
 		err = migratedOpts.RegisterSubstore(skey_2b.Name(), types.StoreTypePersistent)
 		require.NoError(t, err)
 		err = migratedOpts.RegisterSubstore(skey_4.Name(), types.StoreTypePersistent)
-		require.NoError(t, err)
-		err = migratedOpts.RegisterSubstore(skey_5.Name(), types.StoreTypeVerklePersistent)
 		require.NoError(t, err)
 		store, err = NewStore(db, migratedOpts)
 		require.Nil(t, err)
@@ -831,7 +850,7 @@ func TestVerkleMultiStoreMigration(t *testing.T) {
 	})
 }
 
-func TestVerkleTrace(t *testing.T) {
+func TestTrace(t *testing.T) {
 	key, value := []byte("test-key"), []byte("test-value")
 	tctx := types.TraceContext(map[string]interface{}{"blockHeight": 64})
 
@@ -843,9 +862,9 @@ func TestVerkleTrace(t *testing.T) {
 	expected_IterValue := "{\"operation\":\"iterValue\",\"key\":\"\",\"value\":\"dGVzdC12YWx1ZQ==\",\"metadata\":{\"blockHeight\":64}}\n"
 
 	db := memdb.NewDB()
-	opts := verkleSimpleStoreConfig(t)
-	require.NoError(t, opts.RegisterSubstore(skey_2.Name(), types.StoreTypeVerkleMemory))
-	require.NoError(t, opts.RegisterSubstore(skey_3.Name(), types.StoreTypeVerkleTransient))
+	opts := simpleStoreConfig(t)
+	require.NoError(t, opts.RegisterSubstore(skey_2.Name(), types.StoreTypeMemory))
+	require.NoError(t, opts.RegisterSubstore(skey_3.Name(), types.StoreTypeTransient))
 
 	store, err := NewStore(db, opts)
 	require.NoError(t, err)
@@ -888,7 +907,7 @@ func TestVerkleTrace(t *testing.T) {
 	require.NoError(t, store.Close())
 }
 
-func TestVerkleListeners(t *testing.T) {
+func TestListeners(t *testing.T) {
 	kvPairs := []types.KVPair{
 		{Key: []byte{1}, Value: []byte("v1")},
 		{Key: []byte{2}, Value: []byte("v2")},
@@ -921,9 +940,9 @@ func TestVerkleListeners(t *testing.T) {
 	var marshaller = codec.NewProtoCodec(interfaceRegistry)
 
 	db := memdb.NewDB()
-	opts := verkleSimpleStoreConfig(t)
-	require.NoError(t, opts.RegisterSubstore(skey_2.Name(), types.StoreTypeVerkleMemory))
-	require.NoError(t, opts.RegisterSubstore(skey_3.Name(), types.StoreTypeVerkleTransient))
+	opts := simpleStoreConfig(t)
+	require.NoError(t, opts.RegisterSubstore(skey_2.Name(), types.StoreTypeMemory))
+	require.NoError(t, opts.RegisterSubstore(skey_3.Name(), types.StoreTypeTransient))
 
 	store, err := NewStore(db, opts)
 	require.NoError(t, err)
