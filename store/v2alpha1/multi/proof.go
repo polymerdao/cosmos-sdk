@@ -42,7 +42,7 @@ func verkleProveKey(s *verklestore.Store, jsonKeys []byte) (*tmcrypto.ProofOps, 
 	var keys []string
 	err := json.Unmarshal(jsonKeys, &keys)
 	if err != nil {
-		keys = append(keys, string(jsonKeys))
+		keys = []string{string(jsonKeys)}
 	}
 	keyProof, err := s.GetProofICS23(keys)
 	if err != nil {
