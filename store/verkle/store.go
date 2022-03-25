@@ -30,6 +30,11 @@ func Hash(value []byte) []byte {
 	return tmp[:]
 }
 
+func HashStr(value string) string {
+	tmp := sha3.Sum256([]byte(value))
+	return string(tmp[:])
+}
+
 // Store Implements types.KVStore and CommitKVStore.
 type Store struct {
 	tree   verkle.VerkleNode
@@ -128,8 +133,8 @@ func (s *Store) GetProof(key []byte) (*tmcrypto.ProofOps, error) {
 	return &tmcrypto.ProofOps{Ops: []tmcrypto.ProofOp{op.ProofOp()}}, nil
 }
 
-func (s *Store) GetProofICS23(key []byte) (*ics23.CommitmentProof, error) {
-	return createIcs23Proof(s, key)
+func (s *Store) GetProofICS23(keys []string) (*ics23.CommitmentProof, error) {
+	return createIcs23Proof(s, keys)
 }
 
 // BasicKVStore interface below:

@@ -3,6 +3,7 @@ package multi
 import (
 	"bytes"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	ics23 "github.com/confio/ics23/go"
 	verklestore "github.com/cosmos/cosmos-sdk/store/verkle"
@@ -36,14 +37,18 @@ func proveKey(s *smt.Store, key []byte) (*tmcrypto.ProofOps, error) {
 }
 
 // Prove commitment of key within an verkle store and return ProofOps
-func verkleProveKey(s *verklestore.Store, key []byte) (*tmcrypto.ProofOps, error) {
+func verkleProveKey(s *verklestore.Store, jsonKeys []byte) (*tmcrypto.ProofOps, error) {
 	var ret tmcrypto.ProofOps
-	keyProof, err := s.GetProofICS23(key)
+	var keys []string
+	err := json.Unmarshal(jsonKeys, &keys)
+	if err != nil {
+		keys = append(keys, string(jsonKeys))
+	}
+	keyProof, err := s.GetProofICS23(keys)
 	if err != nil {
 		return nil, err
 	}
-	hkey := verklestore.Hash(key)
-	ret.Ops = append(ret.Ops, types.NewVerkleCommitmentOp(hkey, keyProof).ProofOp())
+	ret.Ops = append(ret.Ops, types.NewVerkleCommitmentOp(nil, keyProof).ProofOp())
 	return &ret, nil
 }
 
@@ -91,28 +96,8 @@ func verifyIcs23VerkleProofWithoutRoot(p *ics23.VerkleProof, kvs map[string][]by
 	return root[:], nil
 }
 
-// keyPathValsToKeyVals converts map(key_path, value) to map(key, value)
-func keyPathValsToKeyVals(keypathVals map[string][]byte) (map[string][]byte, error) {
-	ret := make(map[string][]byte)
-	for kp, v := range keypathVals {
-		k, err := merkle.KeyPathToKeys(kp)
-		if err != nil {
-			return nil, err
-		}
-		if len(k) > 2 {
-			return nil, fmt.Errorf("unsupported key path")
-		}
-		ret[string(k[len(k)-1])] = v
-	}
-	return ret, nil
-}
-
 // VerifyVerkleProof verifies Verkle/Merkle proofs for both existence and nonexistence and batch proofs.
-func VerifyVerkleProof(proofOps *tmcrypto.ProofOps, rootCommitment []byte, keypathVals map[string][]byte) error {
-	if len(keypathVals) > 1 {
-		// TODO: add support for multiproofs
-		return fmt.Errorf("multiproofs not supported")
-	}
+func VerifyVerkleProof(proofOps *tmcrypto.ProofOps, rootCommitment []byte, storeName []byte, keyVals map[string][]byte) error {
 	var root []byte
 	for _, p := range proofOps.GetOps() {
 		proofStr := p.GetData()
@@ -122,26 +107,16 @@ func VerifyVerkleProof(proofOps *tmcrypto.ProofOps, rootCommitment []byte, keypa
 			return err
 		}
 		if ics23Proof.GetVerkle() != nil {
-			keyVals, err := keyPathValsToKeyVals(keypathVals)
-			if err != nil {
-				return err
-			}
 			root, err = verifyIcs23VerkleProofWithoutRoot(ics23Proof.GetVerkle(), keyVals)
 			if err != nil {
 				return err
 			}
 		} else {
-			for kp, _ := range keypathVals {
-				k, err := merkle.KeyPathToKeys(kp)
-				if err != nil {
-					return err
-				}
-				if len(k) < 2 {
-					return fmt.Errorf("Invalid key path")
-				}
-			}
 			if root == nil {
 				return fmt.Errorf("Invalid ProofOps")
+			}
+			if !bytes.Equal(storeName, p.GetKey()) {
+				return fmt.Errorf("Wrong storeName")
 			}
 			prt := DefaultProofRuntime()
 			operator, err := prt.Decode(p)

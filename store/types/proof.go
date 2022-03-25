@@ -65,7 +65,7 @@ func NewVerkleCommitmentOp(key []byte, proof *ics23.CommitmentProof) CommitmentO
 	return CommitmentOp{
 		Type:  ProofOpVerkleCommitment,
 		Spec:  nil, // TODO: not used here
-		Key:   key,
+		Key:   key, // TODO: not used here
 		Proof: proof,
 	}
 }

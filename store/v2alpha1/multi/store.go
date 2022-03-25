@@ -1,6 +1,7 @@
 package multi
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	verklestore "github.com/cosmos/cosmos-sdk/store/verkle"
@@ -799,7 +800,24 @@ func (rs *Store) Query(req abci.RequestQuery) (res abci.ResponseQuery) {
 	case "/key":
 		var err error
 		res.Key = req.Data // data holds the key bytes
-		res.Value = substore.Get(res.Key)
+		if useVerkleTree(rs.schema[storeName]) {
+			var keys []string
+			err = json.Unmarshal(req.Data, &keys)
+			if err != nil {
+				res.Value = substore.Get(res.Key)
+			} else {
+				var values []string
+				for _, k := range keys {
+					values = append(values, string(substore.Get([]byte(k))))
+				}
+				res.Value, err = json.Marshal(values)
+				if err != nil {
+					return sdkerrors.QueryResult(sdkerrors.Wrapf(err, "failed to access store: %s", storeName), false)
+				}
+			}
+		} else {
+			res.Value = substore.Get(res.Key)
+		}
 		if !req.Prove {
 			break
 		}

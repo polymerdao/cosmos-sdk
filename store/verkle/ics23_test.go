@@ -29,14 +29,14 @@ func TestProofICS23(t *testing.T) {
 	rootCommitment := s.GetRootCommitment()
 
 	// Membership
-	proof, err := s.GetProofICS23(key01)
+	proof, err := s.GetProofICS23([]string{string(key01)})
 	assert.NoError(t, err)
 	verkleProof01 := proof.GetVerkle()
 	assert.NotNil(t, verkleProof01)
 	assert.NoError(t, verkleProof01.Verify(rootCommitment, map[string][]byte{string(path01): val1Path}))
 
 	// Non-membership
-	proof, err = s.GetProofICS23(key00) // When leaf is leftmost node
+	proof, err = s.GetProofICS23([]string{string(key00)}) // When leaf is leftmost node
 	assert.NoError(t, err)
 	verkleProof := proof.GetVerkle()
 	assert.NotNil(t, verkleProof)
@@ -47,7 +47,7 @@ func TestProofICS23(t *testing.T) {
 
 	// Make sure proofs work with a loaded store
 	s = LoadStore(txn)
-	proof, err = s.GetProofICS23(key10)
+	proof, err = s.GetProofICS23([]string{string(key10)})
 	assert.NoError(t, err)
 	verkleProof = proof.GetVerkle()
 	assert.NoError(t, verkleProof.Verify(rootCommitment, map[string][]byte{string(path10): nil}))
