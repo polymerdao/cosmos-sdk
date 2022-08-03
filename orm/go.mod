@@ -10,7 +10,7 @@ require (
 	github.com/google/go-cmp v0.5.7
 	github.com/iancoleman/strcase v0.2.0
 	github.com/regen-network/gocuke v0.6.1
-	github.com/stretchr/testify v1.7.1
+	github.com/stretchr/testify v1.8.0
 	github.com/tendermint/tm-db v0.6.7
 	google.golang.org/grpc v1.45.0
 	google.golang.org/protobuf v1.28.0
@@ -47,5 +47,5 @@ require (
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	google.golang.org/genproto v0.0.0-20220222213610-43724f9ea8cf // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
