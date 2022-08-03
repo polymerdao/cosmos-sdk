@@ -9,6 +9,7 @@ import (
 
 	pruningtypes "github.com/cosmos/cosmos-sdk/pruning/types"
 	snapshottypes "github.com/cosmos/cosmos-sdk/snapshots/types"
+	"github.com/cosmos/cosmos-sdk/store/v2alpha1"
 	"github.com/cosmos/cosmos-sdk/types/kv"
 )
 
@@ -104,11 +105,11 @@ type MultiStore interface {
 	// Branches MultiStore into a cached storage object.
 	// NOTE: Caller should probably not call .Write() on each, but
 	// call CacheMultiStore.Write().
-	CacheMultiStore() CacheMultiStore
+	CacheMultiStore() v2alpha1.CacheMultiStore
 
 	// CacheMultiStoreWithVersion branches the underlying MultiStore where
 	// each stored is loaded at a specific version (height).
-	CacheMultiStoreWithVersion(version int64) (CacheMultiStore, error)
+	CacheMultiStoreWithVersion(version int64) (v2alpha1.CacheMultiStore, error)
 
 	// Convenience for fetching substores.
 	// If the store does not exist, panics.
