@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	dbm "github.com/cosmos/cosmos-sdk/db"
+	"github.com/cosmos/cosmos-sdk/db/types"
 )
 
 func Int64ToBytes(i int64) []byte {
@@ -21,7 +21,7 @@ func BytesToInt64(buf []byte) int64 {
 	return int64(binary.BigEndian.Uint64(buf))
 }
 
-func BenchmarkRangeScans(b *testing.B, db dbm.DBReadWriter, dbSize int64) {
+func BenchmarkRangeScans(b *testing.B, db types.ReadWriter, dbSize int64) {
 	b.StopTimer()
 
 	rangeSize := int64(10000)
@@ -53,7 +53,7 @@ func BenchmarkRangeScans(b *testing.B, db dbm.DBReadWriter, dbSize int64) {
 	}
 }
 
-func BenchmarkRandomReadsWrites(b *testing.B, db dbm.DBReadWriter) {
+func BenchmarkRandomReadsWrites(b *testing.B, db types.ReadWriter) {
 	b.StopTimer()
 
 	// create dummy data

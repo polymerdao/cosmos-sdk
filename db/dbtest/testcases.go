@@ -8,10 +8,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	dbm "github.com/cosmos/cosmos-sdk/db"
+	"github.com/cosmos/cosmos-sdk/db/types"
 )
 
-type Loader func(*testing.T, string) dbm.DBConnection
+type Loader func(*testing.T, string) types.Connection
 
 func ikey(i int) []byte { return []byte(fmt.Sprintf("key-%03d", i)) }
 func ival(i int) []byte { return []byte(fmt.Sprintf("val-%03d", i)) }
@@ -20,8 +20,8 @@ func DoTestGetSetHasDelete(t *testing.T, load Loader) {
 	t.Helper()
 	db := load(t, t.TempDir())
 
-	var txn dbm.DBReadWriter
-	var view dbm.DBReader
+	var txn types.ReadWriter
+	var view types.Reader
 
 	view = db.Reader()
 	require.NotNil(t, view)
@@ -85,28 +85,28 @@ func DoTestGetSetHasDelete(t *testing.T, load Loader) {
 
 	// Setting, getting, and deleting an empty key should error.
 	_, err = txn.Get([]byte{})
-	require.Equal(t, dbm.ErrKeyEmpty, err)
+	require.Equal(t, types.ErrKeyEmpty, err)
 	_, err = txn.Get(nil)
-	require.Equal(t, dbm.ErrKeyEmpty, err)
+	require.Equal(t, types.ErrKeyEmpty, err)
 
 	_, err = txn.Has([]byte{})
-	require.Equal(t, dbm.ErrKeyEmpty, err)
+	require.Equal(t, types.ErrKeyEmpty, err)
 	_, err = txn.Has(nil)
-	require.Equal(t, dbm.ErrKeyEmpty, err)
+	require.Equal(t, types.ErrKeyEmpty, err)
 
 	err = txn.Set([]byte{}, []byte{0x01})
-	require.Equal(t, dbm.ErrKeyEmpty, err)
+	require.Equal(t, types.ErrKeyEmpty, err)
 	err = txn.Set(nil, []byte{0x01})
-	require.Equal(t, dbm.ErrKeyEmpty, err)
+	require.Equal(t, types.ErrKeyEmpty, err)
 
 	err = txn.Delete([]byte{})
-	require.Equal(t, dbm.ErrKeyEmpty, err)
+	require.Equal(t, types.ErrKeyEmpty, err)
 	err = txn.Delete(nil)
-	require.Equal(t, dbm.ErrKeyEmpty, err)
+	require.Equal(t, types.ErrKeyEmpty, err)
 
 	// Setting a nil value should error, but an empty value is fine.
 	err = txn.Set([]byte("x"), nil)
-	require.Equal(t, dbm.ErrValueNil, err)
+	require.Equal(t, types.ErrValueNil, err)
 
 	err = txn.Set([]byte("x"), []byte{})
 	require.NoError(t, err)
@@ -140,19 +140,19 @@ func DoTestIterators(t *testing.T, load Loader) {
 	}
 	require.NoError(t, txn.Commit())
 
-	testRange := func(t *testing.T, iter dbm.Iterator, expected []string) {
-		i := 0
-		for ; iter.Next(); i++ {
-			expectedValue := expected[i]
-			value := iter.Value()
-			require.Equal(t, expectedValue, string(value), "i=%v", i)
-		}
-		require.Equal(t, len(expected), i)
-	}
-
 	type testCase struct {
 		start, end []byte
 		expected   []string
+	}
+	testRange := func(t *testing.T, iter types.Iterator, tc testCase) {
+		i := 0
+		for ; iter.Next(); i++ {
+			expectedValue := tc.expected[i]
+			value := iter.Value()
+			require.Equal(t, expectedValue, string(value),
+				"i=%v case=[[%x] [%x])", i, tc.start, tc.end)
+		}
+		require.Equal(t, len(tc.expected), i)
 	}
 
 	view := db.Reader()
@@ -165,11 +165,10 @@ func DoTestIterators(t *testing.T, load Loader) {
 		{[]byte{0x00, 0x01}, []byte{0x01}, []string{"0 1", "0 2"}},
 		{nil, []byte{0x01}, []string{"0", "0 0", "0 1", "0 2"}},
 	}
-	for i, tc := range iterCases {
-		t.Logf("Iterator case %d: [%v, %v)", i, tc.start, tc.end)
+	for _, tc := range iterCases {
 		it, err := view.Iterator(tc.start, tc.end)
 		require.NoError(t, err)
-		testRange(t, it, tc.expected)
+		testRange(t, it, tc)
 		it.Close()
 	}
 
@@ -181,11 +180,10 @@ func DoTestIterators(t *testing.T, load Loader) {
 		{[]byte{0x00, 0x01}, []byte{0x01}, []string{"0 2", "0 1"}},
 		{nil, []byte{0x01}, []string{"0 2", "0 1", "0 0", "0"}},
 	}
-	for i, tc := range reverseCases {
-		t.Logf("ReverseIterator case %d: [%v, %v)", i, tc.start, tc.end)
+	for _, tc := range reverseCases {
 		it, err := view.ReverseIterator(tc.start, tc.end)
 		require.NoError(t, err)
-		testRange(t, it, tc.expected)
+		testRange(t, it, tc)
 		it.Close()
 	}
 
@@ -262,11 +260,11 @@ func DoTestVersioning(t *testing.T, load Loader) {
 	require.NoError(t, view.Discard())
 
 	view, err = db.ReaderAt(versions.Last() + 1)
-	require.Equal(t, dbm.ErrVersionDoesNotExist, err, "should fail to read a nonexistent version")
+	require.Equal(t, types.ErrVersionDoesNotExist, err, "should fail to read a nonexistent version")
 
 	require.NoError(t, db.DeleteVersion(v2), "should delete version v2")
 	view, err = db.ReaderAt(v2)
-	require.Equal(t, dbm.ErrVersionDoesNotExist, err)
+	require.Equal(t, types.ErrVersionDoesNotExist, err)
 
 	// Ensure latest version is accurate
 	prev := v3
@@ -297,10 +295,10 @@ func DoTestVersioning(t *testing.T, load Loader) {
 func DoTestTransactions(t *testing.T, load Loader, multipleWriters bool) {
 	t.Helper()
 	db := load(t, t.TempDir())
-	// Both methods should work in a DBWriter context
-	writerFuncs := []func() dbm.DBWriter{
+	// Both methods should work in a Writer context
+	writerFuncs := []func() types.Writer{
 		db.Writer,
-		func() dbm.DBWriter { return db.ReadWriter() },
+		func() types.Writer { return db.ReadWriter() },
 	}
 
 	for _, getWriter := range writerFuncs {
@@ -323,7 +321,7 @@ func DoTestTransactions(t *testing.T, load Loader, multipleWriters bool) {
 			tx := getWriter()
 			require.NoError(t, tx.Set([]byte("0"), []byte("a")))
 			_, err := db.SaveNextVersion()
-			require.Equal(t, dbm.ErrOpenTransactions, err)
+			require.Equal(t, types.ErrOpenTransactions, err)
 			require.NoError(t, tx.Discard())
 		})
 
@@ -397,7 +395,7 @@ func DoTestRevert(t *testing.T, load Loader, reload bool) {
 	t.Helper()
 	dirname := t.TempDir()
 	db := load(t, dirname)
-	var txn dbm.DBWriter
+	var txn types.Writer
 
 	initContents := func() {
 		txn = db.Writer()
@@ -414,6 +412,8 @@ func DoTestRevert(t *testing.T, load Loader, reload bool) {
 	}
 
 	initContents()
+	require.Error(t, db.RevertTo(0))  // RevertTo(0) is not allowed - user must use Revert()
+	require.Error(t, db.RevertTo(10)) // non-existent version
 	require.NoError(t, db.Revert())
 	view := db.Reader()
 	it, err := view.Iterator(nil, nil)
@@ -423,7 +423,7 @@ func DoTestRevert(t *testing.T, load Loader, reload bool) {
 	require.NoError(t, view.Discard())
 
 	initContents()
-	_, err = db.SaveNextVersion()
+	v1, err := db.SaveNextVersion()
 	require.NoError(t, err)
 
 	// get snapshot of db state
@@ -444,7 +444,7 @@ func DoTestRevert(t *testing.T, load Loader, reload bool) {
 		require.NoError(t, err)
 		for it.Next() {
 			val, has := state[string(it.Key())]
-			require.True(t, has, "key should not be present: %v => %v", it.Key(), it.Value())
+			require.True(t, has, "unexpected key: %v => %v", it.Key(), it.Value())
 			require.Equal(t, val, it.Value())
 			count++
 		}
@@ -453,7 +453,7 @@ func DoTestRevert(t *testing.T, load Loader, reload bool) {
 		view.Discard()
 	}
 
-	changeContents := func() {
+	modifyContents := func() {
 		txn = db.Writer()
 		require.NoError(t, txn.Set([]byte{3}, []byte{15}))
 		require.NoError(t, txn.Set([]byte{7}, []byte{70}))
@@ -465,48 +465,54 @@ func DoTestRevert(t *testing.T, load Loader, reload bool) {
 		txn = db.Writer()
 		require.NoError(t, txn.Set([]byte{3}, []byte{30}))
 		require.NoError(t, txn.Set([]byte{8}, []byte{8}))
-		require.NoError(t, txn.Delete([]byte{9}))
+		require.NoError(t, txn.Delete([]byte{9})) // redundant delete
 		require.NoError(t, txn.Commit())
 	}
 
-	changeContents()
+	modifyContents()
 
-	if reload {
-		db.Close()
-		db = load(t, dirname)
+	cases := []func(types.Connection) error{
+		func(db types.Connection) error { return db.Revert() },
+		func(db types.Connection) error { return db.RevertTo(v1) },
 	}
+	for _, revertFunc := range cases {
+		if reload {
+			db.Close()
+			db = load(t, dirname)
+		}
 
-	txn = db.Writer()
-	require.Error(t, db.Revert()) // can't revert with open writers
-	txn.Discard()
-	require.NoError(t, db.Revert())
+		txn = db.Writer()
+		require.Error(t, revertFunc(db)) // can't revert with open writers
+		txn.Discard()
+		require.NoError(t, db.Revert())
 
-	if reload {
-		db.Close()
-		db = load(t, dirname)
+		if reload {
+			db.Close()
+			db = load(t, dirname)
+		}
+
+		checkContents()
+
+		// With intermediate versions added & deleted, revert again to v1
+		modifyContents()
+		v2, _ := db.SaveNextVersion()
+
+		txn = db.Writer()
+		require.NoError(t, txn.Delete([]byte{6}))
+		require.NoError(t, txn.Set([]byte{8}, []byte{9}))
+		require.NoError(t, txn.Set([]byte{11}, []byte{11}))
+		txn.Commit()
+		v3, _ := db.SaveNextVersion()
+
+		txn = db.Writer()
+		require.NoError(t, txn.Set([]byte{12}, []byte{12}))
+		txn.Commit()
+
+		db.DeleteVersion(v2)
+		db.DeleteVersion(v3)
+		revertFunc(db)
+		checkContents()
 	}
-
-	checkContents()
-
-	// With intermediate versions added & deleted, revert again to v1
-	changeContents()
-	v2, _ := db.SaveNextVersion()
-
-	txn = db.Writer()
-	require.NoError(t, txn.Delete([]byte{6}))
-	require.NoError(t, txn.Set([]byte{8}, []byte{9}))
-	require.NoError(t, txn.Set([]byte{11}, []byte{11}))
-	txn.Commit()
-	v3, _ := db.SaveNextVersion()
-
-	txn = db.Writer()
-	require.NoError(t, txn.Set([]byte{12}, []byte{12}))
-	txn.Commit()
-
-	db.DeleteVersion(v2)
-	db.DeleteVersion(v3)
-	db.Revert()
-	checkContents()
 
 	require.NoError(t, db.Close())
 }
