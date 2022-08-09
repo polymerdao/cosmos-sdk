@@ -11,7 +11,8 @@ import (
 	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 
 	"github.com/cosmos/cosmos-sdk/store/gaskv"
-	storetypes "github.com/cosmos/cosmos-sdk/store/types"
+	stypes "github.com/cosmos/cosmos-sdk/store/types"
+	stypes2 "github.com/cosmos/cosmos-sdk/store/v2alpha1"
 )
 
 /*
@@ -24,7 +25,7 @@ and standard additions here would be better just to add to the Context struct
 */
 type Context struct {
 	baseCtx       context.Context
-	ms            MultiStore
+	store         stypes2.MultiStore
 	header        tmproto.Header
 	headerHash    tmbytes.HexBytes
 	chainID       string
@@ -36,7 +37,7 @@ type Context struct {
 	checkTx       bool
 	recheckTx     bool // if recheckTx == true, then checkTx must also be true
 	minGasPrice   DecCoins
-	consParams    *abci.ConsensusParams
+	consParams    *tmproto.ConsensusParams
 	eventManager  *EventManager
 	priority      int64 // The tx priority, only relevant in CheckTx
 }
@@ -45,21 +46,21 @@ type Context struct {
 type Request = Context
 
 // Read-only accessors
-func (c Context) Context() context.Context    { return c.baseCtx }
-func (c Context) MultiStore() MultiStore      { return c.ms }
-func (c Context) BlockHeight() int64          { return c.header.Height }
-func (c Context) BlockTime() time.Time        { return c.header.Time }
-func (c Context) ChainID() string             { return c.chainID }
-func (c Context) TxBytes() []byte             { return c.txBytes }
-func (c Context) Logger() log.Logger          { return c.logger }
-func (c Context) VoteInfos() []abci.VoteInfo  { return c.voteInfo }
-func (c Context) GasMeter() GasMeter          { return c.gasMeter }
-func (c Context) BlockGasMeter() GasMeter     { return c.blockGasMeter }
-func (c Context) IsCheckTx() bool             { return c.checkTx }
-func (c Context) IsReCheckTx() bool           { return c.recheckTx }
-func (c Context) MinGasPrices() DecCoins      { return c.minGasPrice }
-func (c Context) EventManager() *EventManager { return c.eventManager }
-func (c Context) Priority() int64             { return c.priority }
+func (c Context) Context() context.Context       { return c.baseCtx }
+func (c Context) MultiStore() stypes2.MultiStore { return c.store }
+func (c Context) BlockHeight() int64             { return c.header.Height }
+func (c Context) BlockTime() time.Time           { return c.header.Time }
+func (c Context) ChainID() string                { return c.chainID }
+func (c Context) TxBytes() []byte                { return c.txBytes }
+func (c Context) Logger() log.Logger             { return c.logger }
+func (c Context) VoteInfos() []abci.VoteInfo     { return c.voteInfo }
+func (c Context) GasMeter() GasMeter             { return c.gasMeter }
+func (c Context) BlockGasMeter() GasMeter        { return c.blockGasMeter }
+func (c Context) IsCheckTx() bool                { return c.checkTx }
+func (c Context) IsReCheckTx() bool              { return c.recheckTx }
+func (c Context) MinGasPrices() DecCoins         { return c.minGasPrice }
+func (c Context) EventManager() *EventManager    { return c.eventManager }
+func (c Context) Priority() int64                { return c.priority }
 
 // clone the header before returning
 func (c Context) BlockHeader() tmproto.Header {
@@ -74,8 +75,8 @@ func (c Context) HeaderHash() tmbytes.HexBytes {
 	return hash
 }
 
-func (c Context) ConsensusParams() *abci.ConsensusParams {
-	return proto.Clone(c.consParams).(*abci.ConsensusParams)
+func (c Context) ConsensusParams() *tmproto.ConsensusParams {
+	return proto.Clone(c.consParams).(*tmproto.ConsensusParams)
 }
 
 func (c Context) Deadline() (deadline time.Time, ok bool) {
@@ -91,17 +92,17 @@ func (c Context) Err() error {
 }
 
 // create a new context
-func NewContext(ms MultiStore, header tmproto.Header, isCheckTx bool, logger log.Logger) Context {
+func NewContext(ms stypes2.MultiStore, header tmproto.Header, isCheckTx bool, logger log.Logger) Context {
 	// https://github.com/gogo/protobuf/issues/519
 	header.Time = header.Time.UTC()
 	return Context{
 		baseCtx:      context.Background(),
-		ms:           ms,
+		store:        ms,
 		header:       header,
 		chainID:      header.ChainID,
 		checkTx:      isCheckTx,
 		logger:       logger,
-		gasMeter:     storetypes.NewInfiniteGasMeter(),
+		gasMeter:     stypes.NewInfiniteGasMeter(),
 		minGasPrice:  DecCoins{},
 		eventManager: NewEventManager(),
 	}
@@ -114,8 +115,8 @@ func (c Context) WithContext(ctx context.Context) Context {
 }
 
 // WithMultiStore returns a Context with an updated MultiStore.
-func (c Context) WithMultiStore(ms MultiStore) Context {
-	c.ms = ms
+func (c Context) WithMultiStore(ms stypes2.MultiStore) Context {
+	c.store = ms
 	return c
 }
 
@@ -217,7 +218,7 @@ func (c Context) WithMinGasPrices(gasPrices DecCoins) Context {
 }
 
 // WithConsensusParams returns a Context with an updated consensus params
-func (c Context) WithConsensusParams(params *abci.ConsensusParams) Context {
+func (c Context) WithConsensusParams(params *tmproto.ConsensusParams) Context {
 	c.consParams = params
 	return c
 }
@@ -236,7 +237,7 @@ func (c Context) WithPriority(p int64) Context {
 
 // TODO: remove???
 func (c Context) IsZero() bool {
-	return c.ms == nil
+	return c.store == nil
 }
 
 func (c Context) WithValue(key, value interface{}) Context {
@@ -257,22 +258,22 @@ func (c Context) Value(key interface{}) interface{} {
 // ----------------------------------------------------------------------------
 
 // KVStore fetches a KVStore from the MultiStore.
-func (c Context) KVStore(key storetypes.StoreKey) KVStore {
-	return gaskv.NewStore(c.MultiStore().GetKVStore(key), c.GasMeter(), storetypes.KVGasConfig())
+func (c Context) KVStore(key stypes.StoreKey) stypes.KVStore {
+	return gaskv.NewStore(c.MultiStore().GetKVStore(key), c.GasMeter(), stypes.KVGasConfig())
 }
 
 // TransientStore fetches a TransientStore from the MultiStore.
-func (c Context) TransientStore(key storetypes.StoreKey) KVStore {
-	return gaskv.NewStore(c.MultiStore().GetKVStore(key), c.GasMeter(), storetypes.TransientGasConfig())
+func (c Context) TransientStore(key stypes.StoreKey) stypes.KVStore {
+	return gaskv.NewStore(c.MultiStore().GetKVStore(key), c.GasMeter(), stypes.TransientGasConfig())
 }
 
 // CacheContext returns a new Context with the multi-store cached and a new
 // EventManager. The cached context is written to the context when writeCache
 // is called.
 func (c Context) CacheContext() (cc Context, writeCache func()) {
-	cms := c.MultiStore().CacheMultiStore()
-	cc = c.WithMultiStore(cms).WithEventManager(NewEventManager())
-	return cc, cms.Write
+	cs := c.MultiStore().CacheWrap()
+	cc = c.WithMultiStore(cs).WithEventManager(NewEventManager())
+	return cc, cs.Write
 }
 
 var _ context.Context = Context{}
