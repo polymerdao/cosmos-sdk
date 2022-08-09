@@ -23,19 +23,31 @@ import (
 	"github.com/cosmos/cosmos-sdk/store/types"
 )
 
-func multiStoreConfig(t *testing.T, stores int) StoreConfig {
-	opts := DefaultStoreConfig()
+var testStoreKeys []types.StoreKey
+
+func makeStoreKeys(upto int) {
+	if len(testStoreKeys) >= upto {
+		return
+	}
+	for i := len(testStoreKeys); i < upto; i++ {
+		skey := types.NewKVStoreKey(fmt.Sprintf("store%d", i))
+		testStoreKeys = append(testStoreKeys, skey)
+	}
+}
+
+func multiStoreConfig(t *testing.T, stores int) StoreParams {
+	opts := DefaultStoreParams()
 	opts.Pruning = pruningtypes.NewPruningOptions(pruningtypes.PruningNothing)
 
+	makeStoreKeys(stores)
 	for i := 0; i < stores; i++ {
-		sKey := types.NewKVStoreKey(fmt.Sprintf("store%d", i))
-		require.NoError(t, opts.RegisterSubstore(sKey.Name(), types.StoreTypePersistent))
+		require.NoError(t, opts.RegisterSubstore(testStoreKeys[i], types.StoreTypePersistent))
 	}
 
 	return opts
 }
 
-func newMultiStoreWithGeneratedData(t *testing.T, db dbm.DBConnection, stores int, storeKeys uint64) *Store {
+func newMultiStoreWithGeneratedData(t *testing.T, db dbm.Connection, stores int, storeKeys uint64) *Store {
 	cfg := multiStoreConfig(t, stores)
 	store, err := NewStore(db, cfg)
 	require.NoError(t, err)
@@ -43,7 +55,7 @@ func newMultiStoreWithGeneratedData(t *testing.T, db dbm.DBConnection, stores in
 
 	var sKeys []string
 	for sKey := range store.schema {
-		sKeys = append(sKeys, sKey)
+		sKeys = append(sKeys, sKey.Name())
 	}
 
 	sort.Slice(sKeys, func(i, j int) bool {
@@ -68,13 +80,13 @@ func newMultiStoreWithGeneratedData(t *testing.T, db dbm.DBConnection, stores in
 	return store
 }
 
-func newMultiStoreWithBasicData(t *testing.T, db dbm.DBConnection, stores int) *Store {
+func newMultiStoreWithBasicData(t *testing.T, db dbm.Connection, stores int) *Store {
 	cfg := multiStoreConfig(t, stores)
 	store, err := NewStore(db, cfg)
 	require.NoError(t, err)
 
 	for sKey := range store.schema {
-		sStore, err := store.getSubstore(sKey)
+		sStore, err := store.getSubstore(sKey.Name())
 		require.NoError(t, err)
 		for k, v := range alohaData {
 			sStore.Set([]byte(k), []byte(v))
@@ -85,7 +97,7 @@ func newMultiStoreWithBasicData(t *testing.T, db dbm.DBConnection, stores int) *
 	return store
 }
 
-func newMultiStore(t *testing.T, db dbm.DBConnection, stores int) *Store {
+func newMultiStore(t *testing.T, db dbm.Connection, stores int) *Store {
 	cfg := multiStoreConfig(t, stores)
 	store, err := NewStore(db, cfg)
 	require.NoError(t, err)
@@ -216,9 +228,9 @@ func TestMultistoreSnapshotRestore(t *testing.T) {
 	assert.Equal(t, source.LastCommitID(), target.LastCommitID())
 
 	for sKey := range source.schema {
-		sourceSubStore, err := source.getSubstore(sKey)
+		sourceSubStore, err := source.getSubstore(sKey.Name())
 		require.NoError(t, err)
-		targetSubStore, err := target.getSubstore(sKey)
+		targetSubStore, err := target.getSubstore(sKey.Name())
 		require.NoError(t, err)
 		require.Equal(t, sourceSubStore, targetSubStore)
 	}

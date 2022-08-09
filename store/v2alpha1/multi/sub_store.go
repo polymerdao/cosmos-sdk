@@ -1,16 +1,13 @@
 package multi
 
 import (
-	"crypto/sha256"
 	"io"
-	"sync"
 
-	dbm "github.com/cosmos/cosmos-sdk/db"
 	dbutil "github.com/cosmos/cosmos-sdk/internal/db"
 	"github.com/cosmos/cosmos-sdk/store/cachekv"
 	"github.com/cosmos/cosmos-sdk/store/listenkv"
 	"github.com/cosmos/cosmos-sdk/store/tracekv"
-	"github.com/cosmos/cosmos-sdk/store/types"
+	types "github.com/cosmos/cosmos-sdk/store/v2alpha1"
 )
 
 // Get implements KVStore.
@@ -47,38 +44,15 @@ func (s *substore) Set(key, value []byte) {
 		panic(err)
 	}
 	s.stateCommitmentStore.Set(key, value)
-	khash := sha256.Sum256(key)
-	err = s.indexBucket.Set(khash[:], key)
-	if err != nil {
-		panic(err)
-	}
 }
 
 // Delete implements KVStore.
 func (s *substore) Delete(key []byte) {
-	khash := sha256.Sum256(key)
 	s.root.mtx.Lock()
 	defer s.root.mtx.Unlock()
 
 	s.stateCommitmentStore.Delete(key)
-	_ = s.indexBucket.Delete(khash[:])
 	_ = s.dataBucket.Delete(key)
-}
-
-type contentsIterator struct {
-	types.Iterator
-	locker sync.Locker
-}
-
-func (s *substore) newSubstoreIterator(source dbm.Iterator) *contentsIterator {
-	locker := s.root.mtx.RLocker()
-	locker.Lock()
-	return &contentsIterator{dbutil.DBToStoreIterator(source), locker}
-}
-
-func (it *contentsIterator) Close() error {
-	defer it.locker.Unlock()
-	return it.Iterator.Close()
 }
 
 // Iterator implements KVStore.
@@ -87,7 +61,7 @@ func (s *substore) Iterator(start, end []byte) types.Iterator {
 	if err != nil {
 		panic(err)
 	}
-	return s.newSubstoreIterator(iter)
+	return dbutil.ToStoreIterator(iter)
 }
 
 // ReverseIterator implements KVStore.
@@ -96,7 +70,7 @@ func (s *substore) ReverseIterator(start, end []byte) types.Iterator {
 	if err != nil {
 		panic(err)
 	}
-	return s.newSubstoreIterator(iter)
+	return dbutil.ToStoreIterator(iter)
 }
 
 // GetStoreType implements Store.

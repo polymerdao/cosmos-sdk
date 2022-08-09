@@ -17,6 +17,65 @@ import (
 
 var ErrReadOnly = errors.New("cannot modify read-only store")
 
+// Read-only store for querying past versions
+type viewStore struct {
+	stateView           dbm.Reader
+	stateCommitmentView dbm.Reader
+	substoreCache       map[string]*viewSubstore
+	schema              StoreSchema
+}
+
+type viewSubstore struct {
+	root                 *viewStore
+	name                 string
+	dataBucket           dbm.Reader
+	stateCommitmentStore *smt.Store
+}
+
+func (s *viewStore) GetKVStore(skey types.StoreKey) types.KVStore {
+	key := skey.Name()
+	if _, has := s.schema[key]; !has {
+		panic(ErrStoreNotFound(key))
+	}
+	ret, err := s.getSubstore(key)
+	if err != nil {
+		panic(err)
+	}
+	s.substoreCache[key] = ret
+	return ret
+}
+
+func (vs *viewStore) HasKVStore(skey types.StoreKey) bool {
+	_, has := vs.schema[skey.Name()]
+	return has
+}
+
+// Reads but does not update substore cache
+func (s *viewStore) getSubstore(key string) (*viewSubstore, error) {
+	if cached, has := s.substoreCache[key]; has {
+		return cached, nil
+	}
+	pfx := prefixSubstore(key)
+	stateR := prefixdb.NewReader(s.stateView, pfx)
+	stateCommitmentR := prefixdb.NewReader(s.stateCommitmentView, pfx)
+	rootHash, err := stateR.Get(merkleRootKey)
+	if err != nil {
+		return nil, err
+	}
+	return &viewSubstore{
+		root:                 s,
+		name:                 key,
+		dataBucket:           prefixdb.NewReader(stateR, dataPrefix),
+		stateCommitmentStore: loadSMT(dbm.ReaderAsReadWriter(stateCommitmentR), rootHash),
+	}, nil
+}
+
+// CacheWrap implements MultiStore.
+// Because this store is a read-only view, the returned store's Write operation is a no-op.
+func (s *viewStore) CacheWrap() types.CacheMultiStore {
+	return noopCacheStore{newCacheStore(s)}
+}
+
 func (s *viewSubstore) GetStateCommitmentStore() *smt.Store {
 	return s.stateCommitmentStore
 }
@@ -55,7 +114,7 @@ func (s *viewSubstore) Iterator(start, end []byte) types.Iterator {
 	if err != nil {
 		panic(err)
 	}
-	return dbutil.DBToStoreIterator(iter)
+	return dbutil.ToStoreIterator(iter)
 }
 
 // ReverseIterator implements KVStore.
@@ -64,7 +123,7 @@ func (s *viewSubstore) ReverseIterator(start, end []byte) types.Iterator {
 	if err != nil {
 		panic(err)
 	}
-	return dbutil.DBToStoreIterator(iter)
+	return dbutil.ToStoreIterator(iter)
 }
 
 // GetStoreType implements Store.
@@ -72,16 +131,16 @@ func (s *viewSubstore) GetStoreType() types.StoreType {
 	return types.StoreTypePersistent
 }
 
-func (st *viewSubstore) CacheWrap() types.CacheWrap {
-	return cachekv.NewStore(st)
+func (s *viewSubstore) CacheWrap() types.CacheWrap {
+	return cachekv.NewStore(s)
 }
 
-func (st *viewSubstore) CacheWrapWithTrace(w io.Writer, tc types.TraceContext) types.CacheWrap {
-	return cachekv.NewStore(tracekv.NewStore(st, w, tc))
+func (s *viewSubstore) CacheWrapWithTrace(w io.Writer, tc types.TraceContext) types.CacheWrap {
+	return cachekv.NewStore(tracekv.NewStore(s, w, tc))
 }
 
-func (st *viewSubstore) CacheWrapWithListeners(storeKey types.StoreKey, listeners []types.WriteListener) types.CacheWrap {
-	return cachekv.NewStore(listenkv.NewStore(st, storeKey, listeners))
+func (s *viewSubstore) CacheWrapWithListeners(storeKey types.StoreKey, listeners []types.WriteListener) types.CacheWrap {
+	return cachekv.NewStore(listenkv.NewStore(s, storeKey, listeners))
 }
 
 func (s *viewStore) getMerkleRoots() (ret map[string][]byte, err error) {
@@ -123,7 +182,7 @@ func (store *Store) getView(version int64) (ret *viewStore, err error) {
 		}()
 	}
 	// Now read this version's schema
-	schemaView := prefixdb.NewPrefixReader(stateView, schemaPrefix)
+	schemaView := prefixdb.NewReader(stateView, schemaPrefix)
 	defer func() {
 		if err != nil {
 			err = util.CombineErrors(err, schemaView.Discard(), "schemaView.Discard also failed")
@@ -140,39 +199,5 @@ func (store *Store) getView(version int64) (ret *viewStore, err error) {
 		substoreCache:       map[string]*viewSubstore{},
 		schema:              pr.StoreSchema,
 	}
-	return
-}
-
-func (vs *viewStore) GetKVStore(skey types.StoreKey) types.KVStore {
-	key := skey.Name()
-	if _, has := vs.schema[key]; !has {
-		panic(ErrStoreNotFound(key))
-	}
-	ret, err := vs.getSubstore(key)
-	if err != nil {
-		panic(err)
-	}
-	vs.substoreCache[key] = ret
-	return ret
-}
-
-// Reads but does not update substore cache
-func (vs *viewStore) getSubstore(key string) (*viewSubstore, error) {
-	if cached, has := vs.substoreCache[key]; has {
-		return cached, nil
-	}
-	pfx := substorePrefix(key)
-	stateR := prefixdb.NewPrefixReader(vs.stateView, pfx)
-	stateCommitmentR := prefixdb.NewPrefixReader(vs.stateCommitmentView, pfx)
-	rootHash, err := stateR.Get(merkleRootKey)
-	if err != nil {
-		return nil, err
-	}
-	return &viewSubstore{
-		root:                 vs,
-		name:                 key,
-		dataBucket:           prefixdb.NewPrefixReader(stateR, dataPrefix),
-		indexBucket:          prefixdb.NewPrefixReader(stateR, indexPrefix),
-		stateCommitmentStore: loadSMT(dbm.ReaderAsReadWriter(stateCommitmentR), rootHash),
-	}, nil
+	return ret, err
 }

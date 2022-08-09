@@ -9,30 +9,26 @@ import (
 
 // Re-export relevant original store types
 type (
-	StoreKey      = v1.StoreKey
-	StoreType     = v1.StoreType
-	CommitID      = v1.CommitID
-	StoreUpgrades = v1.StoreUpgrades
-	StoreRename   = v1.StoreRename
-	Iterator      = v1.Iterator
-
-	TraceContext  = v1.TraceContext
-	WriteListener = v1.WriteListener
-
-	BasicKVStore  = v1.BasicKVStore
-	KVStore       = v1.KVStore
-	Committer     = v1.Committer
-	CommitKVStore = v1.CommitKVStore
-	CacheKVStore  = v1.CacheKVStore
-	Queryable     = v1.Queryable
-	CacheWrap     = v1.CacheWrap
-
+	StoreKey          = v1.StoreKey
+	StoreType         = v1.StoreType
+	CommitID          = v1.CommitID
+	StoreUpgrades     = v1.StoreUpgrades
+	StoreRename       = v1.StoreRename
+	Iterator          = v1.Iterator
+	TraceContext      = v1.TraceContext
+	WriteListener     = v1.WriteListener
+	BasicKVStore      = v1.BasicKVStore
+	KVStore           = v1.KVStore
+	Committer         = v1.Committer
+	CommitKVStore     = v1.CommitKVStore
+	CacheKVStore      = v1.CacheKVStore
+	Queryable         = v1.Queryable
+	CacheWrap         = v1.CacheWrap
 	KVStoreKey        = v1.KVStoreKey
 	MemoryStoreKey    = v1.MemoryStoreKey
 	TransientStoreKey = v1.TransientStoreKey
-
-	KVPair      = v1.KVPair
-	StoreKVPair = v1.StoreKVPair
+	KVPair            = v1.KVPair
+	StoreKVPair       = v1.StoreKVPair
 )
 
 // Re-export relevant constants, values and utility functions
@@ -45,33 +41,38 @@ const (
 )
 
 var (
-	NewKVStoreKey                = v1.NewKVStoreKey
-	PrefixEndBytes               = v1.PrefixEndBytes
-	KVStorePrefixIterator        = v1.KVStorePrefixIterator
-	KVStoreReversePrefixIterator = v1.KVStoreReversePrefixIterator
-
-	NewStoreKVPairWriteListener = v1.NewStoreKVPairWriteListener
-
+	NewKVStoreKey                 = v1.NewKVStoreKey
+	NewMemoryStoreKey             = v1.NewMemoryStoreKey
+	NewTransientStoreKey          = v1.NewTransientStoreKey
+	PrefixEndBytes                = v1.PrefixEndBytes
+	KVStorePrefixIterator         = v1.KVStorePrefixIterator
+	KVStoreReversePrefixIterator  = v1.KVStoreReversePrefixIterator
+	NewStoreKVPairWriteListener   = v1.NewStoreKVPairWriteListener
+	AssertValidKey                = v1.AssertValidKey
+	AssertValidValue              = v1.AssertValidValue
+	CommitmentOpDecoder           = v1.CommitmentOpDecoder
+	ProofOpFromMap                = v1.ProofOpFromMap
 	ProofOpSMTCommitment          = v1.ProofOpSMTCommitment
 	ProofOpSimpleMerkleCommitment = v1.ProofOpSimpleMerkleCommitment
-
-	CommitmentOpDecoder = v1.CommitmentOpDecoder
-	ProofOpFromMap      = v1.ProofOpFromMap
-	NewSmtCommitmentOp  = v1.NewSmtCommitmentOp
+	NewSmtCommitmentOp            = v1.NewSmtCommitmentOp
 )
 
-// BasicMultiStore defines a minimal interface for accessing root state.
-type BasicMultiStore interface {
+// MultiStore defines a minimal interface for accessing root state.
+type MultiStore interface {
+	// Returns true iff the store key is present in the schema.
+	HasKVStore(StoreKey) bool
 	// Returns a KVStore which has access only to the namespace of the StoreKey.
 	// Panics if the key is not found in the schema.
 	GetKVStore(StoreKey) KVStore
+	// Returns a branched store whose modifications are later merged back in.
+	CacheWrap() CacheMultiStore
 }
 
 // mixin interface for trace and listen methods
 type rootStoreTraceListen interface {
 	TracingEnabled() bool
 	SetTracer(w io.Writer)
-	SetTraceContext(TraceContext)
+	SetTracingContext(TraceContext)
 	ListeningEnabled(key StoreKey) bool
 	AddListeners(key StoreKey, listeners []WriteListener)
 }
@@ -79,33 +80,29 @@ type rootStoreTraceListen interface {
 // CommitMultiStore defines a complete interface for persistent root state, including
 // (read-only) access to past versions, pruning, trace/listen, and state snapshots.
 type CommitMultiStore interface {
-	BasicMultiStore
+	MultiStore
 	rootStoreTraceListen
 	Committer
 	snapshottypes.Snapshotter
 
 	// Gets a read-only view of the store at a specific version.
 	// Returns an error if the version is not found.
-	GetVersion(int64) (BasicMultiStore, error)
+	GetVersion(int64) (MultiStore, error)
 	// Closes the store and all backing transactions.
 	Close() error
-	// Returns a branched whose modifications are later merged back in.
-	CacheMultiStore() CacheMultiStore
 	// Defines the minimum version number that can be saved by this store.
 	SetInitialVersion(uint64) error
 }
 
 // CacheMultiStore defines a branch of the root state which can be written back to the source store.
 type CacheMultiStore interface {
-	BasicMultiStore
+	MultiStore
 	rootStoreTraceListen
 
-	// Returns a branched whose modifications are later merged back in.
-	CacheMultiStore() CacheMultiStore
 	// Write all cached changes back to the source store. Note: this overwrites any intervening changes.
 	Write()
 }
 
 // MultiStorePersistentCache provides inter-block (persistent) caching capabilities for a CommitMultiStore.
-// TODO: placeholder. Implement and redefine this
+// TODO: placeholder, not implemented yet, nor used in store
 type MultiStorePersistentCache = v1.MultiStorePersistentCache

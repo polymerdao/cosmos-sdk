@@ -11,7 +11,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/store/v2alpha1/smt"
 )
 
-// We hash keys produce SMT paths, so reflect that here
+// We hash keys to produce SMT paths, so reflect that here
 func keyPath(prefix, key string) string {
 	hashed := sha256.Sum256([]byte(key))
 	return prefix + string(hashed[:])
@@ -51,7 +51,7 @@ func TestVerifySMTStoreProof(t *testing.T) {
 
 func TestVerifyMultiStoreQueryProof(t *testing.T) {
 	db := memdb.NewDB()
-	store, err := NewStore(db, simpleStoreConfig(t))
+	store, err := NewStore(db, storeParams1(t))
 	require.NoError(t, err)
 
 	substore := store.GetKVStore(skey_1)
@@ -95,7 +95,7 @@ func TestVerifyMultiStoreQueryProof(t *testing.T) {
 
 func TestVerifyMultiStoreQueryProofAbsence(t *testing.T) {
 	db := memdb.NewDB()
-	store, err := NewStore(db, simpleStoreConfig(t))
+	store, err := NewStore(db, storeParams1(t))
 	require.NoError(t, err)
 
 	substore := store.GetKVStore(skey_1)
