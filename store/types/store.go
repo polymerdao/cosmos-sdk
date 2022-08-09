@@ -8,14 +8,8 @@ import (
 	dbm "github.com/tendermint/tm-db"
 
 	pruningtypes "github.com/cosmos/cosmos-sdk/pruning/types"
-	types2 "github.com/cosmos/cosmos-sdk/store/v2alpha1"
+	snapshottypes "github.com/cosmos/cosmos-sdk/snapshots/types"
 	"github.com/cosmos/cosmos-sdk/types/kv"
-)
-
-type (
-	MultiStore       = types2.MultiStore
-	CommitMultiStore = types2.CommitMultiStore
-	CacheMultiStore  = types2.CommitMultiStore
 )
 
 type Store interface {
@@ -102,6 +96,98 @@ func (s *StoreUpgrades) RenamedFrom(key string) string {
 		}
 	}
 	return ""
+}
+
+type MultiStore interface {
+	Store
+
+	// Branches MultiStore into a cached storage object.
+	// NOTE: Caller should probably not call .Write() on each, but
+	// call CacheMultiStore.Write().
+	CacheMultiStore() CacheMultiStore
+
+	// CacheMultiStoreWithVersion branches the underlying MultiStore where
+	// each stored is loaded at a specific version (height).
+	CacheMultiStoreWithVersion(version int64) (CacheMultiStore, error)
+
+	// Convenience for fetching substores.
+	// If the store does not exist, panics.
+	GetStore(StoreKey) Store
+	GetKVStore(StoreKey) KVStore
+
+	// TracingEnabled returns if tracing is enabled for the MultiStore.
+	TracingEnabled() bool
+
+	// SetTracer sets the tracer for the MultiStore that the underlying
+	// stores will utilize to trace operations. The modified MultiStore is
+	// returned.
+	SetTracer(w io.Writer) MultiStore
+
+	// SetTracingContext sets the tracing context for a MultiStore. It is
+	// implied that the caller should update the context when necessary between
+	// tracing operations. The modified MultiStore is returned.
+	SetTracingContext(TraceContext) MultiStore
+
+	// ListeningEnabled returns if listening is enabled for the KVStore belonging the provided StoreKey
+	ListeningEnabled(key StoreKey) bool
+
+	// AddListeners adds WriteListeners for the KVStore belonging to the provided StoreKey
+	// It appends the listeners to a current set, if one already exists
+	AddListeners(key StoreKey, listeners []WriteListener)
+}
+
+// From MultiStore.CacheMultiStore()....
+type CacheMultiStore interface {
+	MultiStore
+	Write() // Writes operations to underlying KVStore
+}
+
+// CommitMultiStore is an interface for a MultiStore without cache capabilities.
+type CommitMultiStore interface {
+	Committer
+	MultiStore
+	snapshottypes.Snapshotter
+
+	// Mount a store of type using the given db.
+	// If db == nil, the new store will use the CommitMultiStore db.
+	MountStoreWithDB(key StoreKey, typ StoreType, db dbm.DB)
+
+	// Panics on a nil key.
+	GetCommitStore(key StoreKey) CommitStore
+
+	// Panics on a nil key.
+	GetCommitKVStore(key StoreKey) CommitKVStore
+
+	// Load the latest persisted version. Called once after all calls to
+	// Mount*Store() are complete.
+	LoadLatestVersion() error
+
+	// LoadLatestVersionAndUpgrade will load the latest version, but also
+	// rename/delete/create sub-store keys, before registering all the keys
+	// in order to handle breaking formats in migrations
+	LoadLatestVersionAndUpgrade(upgrades *StoreUpgrades) error
+
+	// LoadVersionAndUpgrade will load the named version, but also
+	// rename/delete/create sub-store keys, before registering all the keys
+	// in order to handle breaking formats in migrations
+	LoadVersionAndUpgrade(ver int64, upgrades *StoreUpgrades) error
+
+	// Load a specific persisted version. When you load an old version, or when
+	// the last commit attempt didn't complete, the next commit after loading
+	// must be idempotent (return the same commit id). Otherwise the behavior is
+	// undefined.
+	LoadVersion(ver int64) error
+
+	// Set an inter-block (persistent) cache that maintains a mapping from
+	// StoreKeys to CommitKVStores.
+	SetInterBlockCache(MultiStorePersistentCache)
+
+	// SetInitialVersion sets the initial version of the IAVL tree. It is used when
+	// starting a new chain at an arbitrary height.
+	SetInitialVersion(version int64) error
+
+	// SetIAVLCacheSize sets the cache size of the IAVL tree.
+	SetIAVLCacheSize(size int)
 }
 
 //---------subsp-------------------------------
