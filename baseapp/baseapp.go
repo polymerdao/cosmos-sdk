@@ -14,9 +14,9 @@ import (
 	"github.com/cosmos/cosmos-sdk/codec/types"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	"github.com/cosmos/cosmos-sdk/snapshots"
-	"github.com/cosmos/cosmos-sdk/store"
 	"github.com/cosmos/cosmos-sdk/store/rootmulti"
 	storetypes "github.com/cosmos/cosmos-sdk/store/types"
+	"github.com/cosmos/cosmos-sdk/store/v2alpha1/multi"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/cosmos/cosmos-sdk/x/auth/migrations/legacytx"
@@ -27,6 +27,9 @@ const (
 	runTxModeReCheck                   // Recheck a (pending) transaction after a commit
 	runTxModeSimulate                  // Simulate a transaction
 	runTxModeDeliver                   // Deliver a transaction
+
+	OptionOrderDefault = iota
+	OptionOrderAfterStore
 )
 
 var _ abci.Application = (*BaseApp)(nil)
@@ -148,8 +151,6 @@ func NewBaseApp(
 		logger:           logger,
 		name:             name,
 		db:               db,
-		cms:              store.NewCommitMultiStore(db),
-		storeLoader:      DefaultStoreLoader,
 		router:           NewRouter(),
 		queryRouter:      NewQueryRouter(),
 		grpcQueryRouter:  NewGRPCQueryRouter(),
@@ -158,12 +159,20 @@ func NewBaseApp(
 		fauxMerkleMode:   false,
 	}
 
+	var afterStoreOpts []AppOption
 	for _, option := range options {
-		option(app)
+		if int(option.Order()) > int(OptionOrderDefault) {
+			afterStoreOpts = append(afterStoreOpts, option)
+		} else {
+			option.Apply(app)
+		}
 	}
 
-	if app.interBlockCache != nil {
-		app.cms.SetInterBlockCache(app.interBlockCache)
+	if err := app.loadStore(); err != nil {
+		panic(err)
+	}
+	for _, option := range afterStoreOpts {
+		option.Apply(app)
 	}
 
 	app.runTxRecoveryMiddleware = newDefaultRecoveryMiddleware()
@@ -194,6 +203,25 @@ func (app *BaseApp) Logger() log.Logger {
 // Trace returns the boolean value for logging error stack traces.
 func (app *BaseApp) Trace() bool {
 	return app.trace
+}
+
+func (app *BaseApp) loadStore() error {
+	versions, err := app.db.Versions()
+	if err != nil {
+		return err
+	}
+	latest := versions.Last()
+	config := multi.DefaultStoreParams()
+	for _, opt := range app.storeOpts {
+		if err = opt(&config, latest); err != nil {
+			return err
+		}
+	}
+	app.cms, err = multi.NewV1MultiStoreAsV2(app.db, config)
+	if err != nil {
+		return fmt.Errorf("failed to load store: %w", err)
+	}
+	return nil
 }
 
 // MsgServiceRouter returns the MsgServiceRouter of a BaseApp.
@@ -409,7 +437,7 @@ func (app *BaseApp) setDeliverState(header tmproto.Header) {
 
 // GetConsensusParams returns the current consensus parameters from the BaseApp's
 // ParamStore. If the BaseApp has no ParamStore defined, nil is returned.
-func (app *BaseApp) GetConsensusParams(ctx sdk.Context) *abci.ConsensusParams {
+func (app *BaseApp) GetConsensusParams(ctx sdk.Context) *tmproto.ConsensusParams {
 	if app.paramStore == nil {
 		return nil
 	}
