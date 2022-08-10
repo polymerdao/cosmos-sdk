@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"io"
 
-	dbm "github.com/tendermint/tm-db"
-
 	"github.com/cosmos/cosmos-sdk/codec/types"
 	pruningtypes "github.com/cosmos/cosmos-sdk/pruning/types"
 	"github.com/cosmos/cosmos-sdk/snapshots"
@@ -59,11 +57,6 @@ func SetIndexEvents(ie []string) func(*BaseApp) {
 	return func(app *BaseApp) { app.setIndexEvents(ie) }
 }
 
-// SetIAVLCacheSize provides a BaseApp option function that sets the size of IAVL cache.
-func SetIAVLCacheSize(size int) func(*BaseApp) {
-	return func(bapp *BaseApp) { bapp.cms.SetIAVLCacheSize(size) }
-}
-
 // SetInterBlockCache provides a BaseApp option function that sets the
 // inter-block cache.
 func SetInterBlockCache(cache sdk.MultiStorePersistentCache) func(*BaseApp) {
@@ -103,14 +96,6 @@ func (app *BaseApp) SetVersion(v string) {
 // SetProtocolVersion sets the application's protocol version
 func (app *BaseApp) SetProtocolVersion(v uint64) {
 	app.appVersion = v
-}
-
-func (app *BaseApp) SetDB(db dbm.DB) {
-	if app.sealed {
-		panic("SetDB() on sealed BaseApp")
-	}
-
-	app.db = db
 }
 
 func (app *BaseApp) SetCMS(cms store.CommitMultiStore) {
