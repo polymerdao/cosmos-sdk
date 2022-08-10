@@ -1,7 +1,7 @@
 package db
 
 import (
-	_ "github.com/cosmos/cosmos-sdk/db/internal/backends"
+	// _ "github.com/cosmos/cosmos-sdk/db/internal/backends"
 	"github.com/cosmos/cosmos-sdk/db/memdb"
 	"github.com/cosmos/cosmos-sdk/db/types"
 )

@@ -1,4 +1,4 @@
-//go:build rocksdb
+//go:build rocksdb_build
 
 package rocksdb
 
