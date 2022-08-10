@@ -225,7 +225,16 @@ func (app *BaseApp) EndBlock(req abci.RequestEndBlock) (res abci.ResponseEndBloc
 	}
 
 	if cp := app.GetConsensusParams(app.deliverState.ctx); cp != nil {
-		res.ConsensusParamUpdates = cp
+
+		res.ConsensusParamUpdates = &abci.ConsensusParams{
+			Block: &abci.BlockParams{
+				MaxBytes: cp.Block.MaxBytes,
+				MaxGas:   cp.Block.MaxGas,
+			},
+			Evidence:  &cp.Evidence,
+			Validator: &cp.Validator,
+			Version:   &cp.Version,
+		}
 	}
 
 	// call the streaming service hooks with the EndBlock messages
@@ -695,8 +704,9 @@ func (app *BaseApp) GetBlockRetentionHeight(commitHeight int64) int64 {
 	// evidence parameters instead of computing an estimated nubmer of blocks based
 	// on the unbonding period and block commitment time as the two should be
 	// equivalent.
+	var emptyEvidence tmproto.EvidenceParams
 	cp := app.GetConsensusParams(app.deliverState.ctx)
-	if cp != nil && cp.Evidence != nil && cp.Evidence.MaxAgeNumBlocks > 0 {
+	if cp != nil && cp.Evidence != emptyEvidence && cp.Evidence.MaxAgeNumBlocks > 0 {
 		retentionHeight = commitHeight - cp.Evidence.MaxAgeNumBlocks
 	}
 
