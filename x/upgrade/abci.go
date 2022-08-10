@@ -5,6 +5,7 @@ import (
 	"time"
 
 	abci "github.com/tendermint/tendermint/abci/types"
+	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 
 	"github.com/cosmos/cosmos-sdk/telemetry"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -38,7 +39,8 @@ func BeginBlocker(k keeper.Keeper, ctx sdk.Context, _ abci.RequestBeginBlock) {
 				var appVersion uint64
 
 				cp := ctx.ConsensusParams()
-				if cp != nil && cp.Version != nil {
+				var empty tmproto.VersionParams
+				if cp != nil && cp.Version != empty {
 					appVersion = cp.Version.AppVersion
 				}
 

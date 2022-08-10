@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
 
 	"github.com/cosmos/cosmos-sdk/x/evidence/types"
 )
@@ -49,7 +50,8 @@ func (k Keeper) HandleEquivocationEvidence(ctx sdk.Context, evidence *types.Equi
 	// if the difference in time and number of blocks is greater than the allowed
 	// parameters defined.
 	cp := ctx.ConsensusParams()
-	if cp != nil && cp.Evidence != nil {
+	var empty tmproto.EvidenceParams
+	if cp != nil && cp.Evidence != empty {
 		if ageDuration > cp.Evidence.MaxAgeDuration && ageBlocks > cp.Evidence.MaxAgeNumBlocks {
 			logger.Info(
 				"ignored equivocation; evidence too old",
