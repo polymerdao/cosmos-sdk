@@ -54,12 +54,13 @@ var DefaultConsensusParams = &tmproto.ConsensusParams{
 func CreateRandomValidatorSet() (*tmtypes.ValidatorSet, error) {
 	privVal := mock.NewPV()
 	pubKey, err := privVal.GetPubKey()
+	pubAuxKey, err := privVal.GetPubKeyAux()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get pub key: %w", err)
 	}
 
 	// create validator set with single validator
-	validator := tmtypes.NewValidator(pubKey, 1)
+	validator := tmtypes.NewValidator(pubKey, pubAuxKey, 1)
 
 	return tmtypes.NewValidatorSet([]*tmtypes.Validator{validator}), nil
 }

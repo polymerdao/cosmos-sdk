@@ -2,6 +2,7 @@ package genutil
 
 import (
 	"encoding/json"
+	"github.com/cometbft/cometbft/crypto/eddsa"
 	"os"
 	"path/filepath"
 	"testing"
@@ -64,7 +65,8 @@ func TestInitializeNodeValidatorFilesFromMnemonic(t *testing.T) {
 				if tt.mnemonic != "" {
 					actualPVFile := privval.LoadFilePV(cfg.PrivValidatorKeyFile(), cfg.PrivValidatorStateFile())
 					expectedPrivateKey := tmed25519.GenPrivKeyFromSecret([]byte(tt.mnemonic))
-					expectedFile := privval.NewFilePV(expectedPrivateKey, cfg.PrivValidatorKeyFile(), cfg.PrivValidatorStateFile())
+					expectedPrivateAuxKey := eddsa.GenPrivKeyFromSecret([]byte(tt.mnemonic))
+					expectedFile := privval.NewFilePV(expectedPrivateKey, expectedPrivateAuxKey, cfg.PrivValidatorKeyFile(), cfg.PrivValidatorStateFile())
 					require.Equal(t, expectedFile, actualPVFile)
 				}
 			}

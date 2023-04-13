@@ -79,6 +79,7 @@ require (
 	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/coinbase/rosetta-sdk-go/types v1.0.0 // indirect
+	github.com/consensys/gnark-crypto v0.7.0 // indirect
 	github.com/cosmos/rosetta-sdk-go v0.10.0 // indirect
 	github.com/creachadair/taskgroup v0.3.2 // indirect
 	github.com/danieljoos/wincred v1.1.2 // indirect
@@ -168,6 +169,7 @@ require (
 replace (
 	// use cosmos fork of keyring
 	github.com/99designs/keyring => github.com/cosmos/keyring v1.2.0
+	github.com/cometbft/cometbft => github.com/polymerdao/cometbft v0.37.0-zkmint
 	// dgrijalva/jwt-go is deprecated and doesn't receive security updates.
 	// TODO: remove it: https://github.com/cosmos/cosmos-sdk/issues/13134
 	github.com/dgrijalva/jwt-go => github.com/golang-jwt/jwt/v4 v4.4.2

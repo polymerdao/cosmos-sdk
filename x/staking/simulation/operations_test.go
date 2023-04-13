@@ -1,6 +1,7 @@
 package simulation_test
 
 import (
+	"github.com/cometbft/cometbft/crypto/eddsa"
 	"math/big"
 	"math/rand"
 	"testing"
@@ -69,8 +70,9 @@ func (s *SimTestSuite) SetupTest() {
 	// create validator set with single validator
 	account := accounts[0]
 	tmPk, err := cryptocodec.ToTmPubKeyInterface(account.PubKey)
+	tmPkAux := eddsa.GenPrivKey().PubKey()
 	require.NoError(s.T(), err)
-	validator := tmtypes.NewValidator(tmPk, 1)
+	validator := tmtypes.NewValidator(tmPk, tmPkAux, 1)
 
 	startupCfg := simtestutil.DefaultStartUpConfig()
 	startupCfg.GenesisAccounts = accs

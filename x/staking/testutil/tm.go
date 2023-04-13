@@ -3,6 +3,7 @@ package testutil
 import (
 	"cosmossdk.io/math"
 	tmcrypto "github.com/cometbft/cometbft/crypto"
+	"github.com/cometbft/cometbft/crypto/eddsa"
 	tmtypes "github.com/cometbft/cometbft/types"
 
 	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
@@ -26,7 +27,8 @@ func ToTmValidator(v types.Validator, r math.Int) (*tmtypes.Validator, error) {
 		return nil, err
 	}
 
-	return tmtypes.NewValidator(tmPk, v.ConsensusPower(r)), nil
+	tmPkAux := eddsa.GenPrivKey().PubKey()
+	return tmtypes.NewValidator(tmPk, tmPkAux, v.ConsensusPower(r)), nil
 }
 
 // ToTmValidators casts all validators to the corresponding tendermint type.

@@ -2,6 +2,7 @@ package simulation_test
 
 import (
 	"fmt"
+	"github.com/cometbft/cometbft/crypto/eddsa"
 	"math/rand"
 	"testing"
 	"time"
@@ -67,7 +68,8 @@ func (suite *SimTestSuite) SetupTest() {
 			return nil, fmt.Errorf("failed to create pubkey: %w", err)
 		}
 
-		validator := tmtypes.NewValidator(tmPk, 1)
+		tmPkAux := eddsa.GenPrivKey().PubKey()
+		validator := tmtypes.NewValidator(tmPk, tmPkAux, 1)
 
 		return tmtypes.NewValidatorSet([]*tmtypes.Validator{validator}), nil
 	}

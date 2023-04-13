@@ -1,6 +1,7 @@
 package types_test
 
 import (
+	"github.com/cometbft/cometbft/crypto/eddsa"
 	"math/rand"
 	"sort"
 	"testing"
@@ -315,8 +316,9 @@ func TestValidatorToTm(t *testing.T) {
 		val.Tokens = sdk.NewInt(rand.Int63())
 		vals[i] = val
 		tmPk, err := cryptocodec.ToTmPubKeyInterface(pk)
+		tmPkAux := eddsa.GenPrivKey().PubKey()
 		require.NoError(t, err)
-		expected[i] = tmtypes.NewValidator(tmPk, val.ConsensusPower(sdk.DefaultPowerReduction))
+		expected[i] = tmtypes.NewValidator(tmPk, tmPkAux, val.ConsensusPower(sdk.DefaultPowerReduction))
 	}
 	vs, err := testutil.ToTmValidators(vals, sdk.DefaultPowerReduction)
 	require.NoError(t, err)

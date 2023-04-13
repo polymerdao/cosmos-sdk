@@ -77,10 +77,11 @@ func GenesisStateWithSingleValidator(t *testing.T, codec codec.Codec, builder *r
 
 	privVal := mock.NewPV()
 	pubKey, err := privVal.GetPubKey()
+	pubAuxKey, err := privVal.GetPubKeyAux()
 	require.NoError(t, err)
 
 	// create validator set with single validator
-	validator := tmtypes.NewValidator(pubKey, 1)
+	validator := tmtypes.NewValidator(pubKey, pubAuxKey, 1)
 	valSet := tmtypes.NewValidatorSet([]*tmtypes.Validator{validator})
 
 	// generate genesis account

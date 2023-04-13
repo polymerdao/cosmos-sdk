@@ -3,6 +3,7 @@ package genutil
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/cometbft/cometbft/crypto/eddsa"
 	"os"
 	"path/filepath"
 	"time"
@@ -81,7 +82,8 @@ func InitializeNodeValidatorFilesFromMnemonic(config *cfg.Config, mnemonic strin
 		filePV = privval.LoadOrGenFilePV(pvKeyFile, pvStateFile)
 	} else {
 		privKey := tmed25519.GenPrivKeyFromSecret([]byte(mnemonic))
-		filePV = privval.NewFilePV(privKey, pvKeyFile, pvStateFile)
+		privAuxKey := eddsa.GenPrivKeyFromSecret([]byte(mnemonic))
+		filePV = privval.NewFilePV(privKey, privAuxKey, pvKeyFile, pvStateFile)
 		filePV.Save()
 	}
 
