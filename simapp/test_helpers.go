@@ -59,9 +59,10 @@ func NewSimappWithCustomOptions(t *testing.T, isCheckTx bool, options SetupOptio
 
 	privVal := mock.NewPV()
 	pubKey, err := privVal.GetPubKey()
+	pubKeyAux, err := privVal.GetPubKeyAux()
 	require.NoError(t, err)
 	// create validator set with single validator
-	validator := tmtypes.NewValidator(pubKey, 1)
+	validator := tmtypes.NewValidator(pubKey, pubKeyAux, 1)
 	valSet := tmtypes.NewValidatorSet([]*tmtypes.Validator{validator})
 
 	// generate genesis account
@@ -101,10 +102,11 @@ func Setup(t *testing.T, isCheckTx bool) *SimApp {
 
 	privVal := mock.NewPV()
 	pubKey, err := privVal.GetPubKey()
+	pubKeyAux, err := privVal.GetPubKeyAux()
 	require.NoError(t, err)
 
 	// create validator set with single validator
-	validator := tmtypes.NewValidator(pubKey, 1)
+	validator := tmtypes.NewValidator(pubKey, pubKeyAux, 1)
 	valSet := tmtypes.NewValidatorSet([]*tmtypes.Validator{validator})
 
 	// generate genesis account
@@ -162,10 +164,11 @@ func GenesisStateWithSingleValidator(t *testing.T, app *SimApp) GenesisState {
 
 	privVal := mock.NewPV()
 	pubKey, err := privVal.GetPubKey()
+	pubKeyAux, err := privVal.GetPubKeyAux()
 	require.NoError(t, err)
 
 	// create validator set with single validator
-	validator := tmtypes.NewValidator(pubKey, 1)
+	validator := tmtypes.NewValidator(pubKey, pubKeyAux, 1)
 	valSet := tmtypes.NewValidatorSet([]*tmtypes.Validator{validator})
 
 	// generate genesis account
