@@ -26,7 +26,7 @@ func ToTmValidator(v types.Validator, r math.Int) (*tmtypes.Validator, error) {
 		return nil, err
 	}
 
-	return tmtypes.NewValidator(tmPk, v.ConsensusPower(r)), nil
+	return tmtypes.NewValidator(tmPk, tmPk, v.ConsensusPower(r)), nil
 }
 
 // ToTmValidators casts all validators to the corresponding tendermint type.

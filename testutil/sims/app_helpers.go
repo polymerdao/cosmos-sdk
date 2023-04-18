@@ -59,7 +59,7 @@ func CreateRandomValidatorSet() (*tmtypes.ValidatorSet, error) {
 	}
 
 	// create validator set with single validator
-	validator := tmtypes.NewValidator(pubKey, 1)
+	validator := tmtypes.NewValidator(pubKey, pubKey, 1)
 
 	return tmtypes.NewValidatorSet([]*tmtypes.Validator{validator}), nil
 }

@@ -27,6 +27,11 @@ func (pv PV) GetPubKey() (crypto.PubKey, error) {
 	return cryptocodec.ToTmPubKeyInterface(pv.PrivKey.PubKey())
 }
 
+// GetPubKey implements PrivValidator interface
+func (pv PV) GetPubKeyAux() (crypto.PubKey, error) {
+	return cryptocodec.ToTmPubKeyInterface(pv.PrivKey.PubKey())
+}
+
 // SignVote implements PrivValidator interface
 func (pv PV) SignVote(chainID string, vote *tmproto.Vote) error {
 	signBytes := tmtypes.VoteSignBytes(chainID, vote)

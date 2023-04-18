@@ -9,6 +9,7 @@ import (
 
 	cfg "github.com/cometbft/cometbft/config"
 	tmed25519 "github.com/cometbft/cometbft/crypto/ed25519"
+	tmeddsa "github.com/cometbft/cometbft/crypto/eddsa"
 	"github.com/cometbft/cometbft/p2p"
 	"github.com/cometbft/cometbft/privval"
 	tmtypes "github.com/cometbft/cometbft/types"
@@ -81,7 +82,8 @@ func InitializeNodeValidatorFilesFromMnemonic(config *cfg.Config, mnemonic strin
 		filePV = privval.LoadOrGenFilePV(pvKeyFile, pvStateFile)
 	} else {
 		privKey := tmed25519.GenPrivKeyFromSecret([]byte(mnemonic))
-		filePV = privval.NewFilePV(privKey, pvKeyFile, pvStateFile)
+		privKeyAux := tmeddsa.GenPrivKeyFromSecret([]byte(mnemonic))
+		filePV = privval.NewFilePV(privKey, privKeyAux, pvKeyFile, pvStateFile)
 		filePV.Save()
 	}
 
