@@ -692,7 +692,7 @@ func (app *BaseApp) FinalizeBlock(req *abci.RequestFinalizeBlock) (*abci.Respons
 			Height:  req.Height,
 			Time:    req.Time,
 			Hash:    req.Hash,
-			AppHash: app.LastCommitID().Hash,
+			// AppHash: app.LastCommitID().Hash,
 		}).
 		WithConsensusParams(app.GetConsensusParams(app.finalizeBlockState.ctx)).
 		WithVoteInfos(req.DecidedLastCommit.Votes).

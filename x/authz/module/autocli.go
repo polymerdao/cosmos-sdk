@@ -25,7 +25,7 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 					PositionalArgs: []*autocliv1.PositionalArgDescriptor{
 						{ProtoField: "granter"},
 						{ProtoField: "grantee"},
-						{ProtoField: "msg_type_url", Optional: true},
+						{ProtoField: "msg_type_url"},
 					},
 				},
 				{

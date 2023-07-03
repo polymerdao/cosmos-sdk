@@ -22,7 +22,7 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 					Short:     "Query the parameters of the governance process",
 					Long:      "Query the parameters of the governance process. Specify specific param types (voting|tallying|deposit) to filter results.",
 					PositionalArgs: []*autocliv1.PositionalArgDescriptor{
-						{ProtoField: "params_type", Optional: true},
+						{ProtoField: "params_type"},
 					},
 				},
 				{

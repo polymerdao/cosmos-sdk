@@ -195,7 +195,7 @@ func CreateSDKLogger(ctx *Context, out io.Writer) (log.Logger, error) {
 	}
 
 	// Check if the CometBFT flag for trace logging is set and enable stack traces if so.
-	opts = append(opts, log.TraceOption(ctx.Viper.GetBool("trace"))) // cmtcli.TraceFlag
+	//opts = append(opts, log.TraceOption(ctx.Viper.GetBool("trace"))) // cmtcli.TraceFlag
 
 	return log.NewLogger(out, opts...), nil
 }
