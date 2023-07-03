@@ -520,6 +520,7 @@ func (app *BaseApp) StoreConsensusParams(ctx sdk.Context, cp cmtproto.ConsensusP
 		panic("cannot store consensus params with no params store set")
 	}
 
+	app.Logger().Info("XXX storing app consensus params")
 	return app.paramStore.Set(ctx, cp)
 }
 

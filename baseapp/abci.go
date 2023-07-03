@@ -550,7 +550,9 @@ func (app *BaseApp) ExtendVote(_ context.Context, req *abci.RequestExtendVote) (
 	emptyHeader := cmtproto.Header{ChainID: app.chainID, Height: req.Height}
 	app.setState(execModeVoteExtension, emptyHeader)
 
+	app.Logger().Info("XXX baseapp ExtendVote")
 	if app.extendVote == nil {
+		app.Logger().Info("XXX ExtendVote handler is nil")
 		return nil, errors.New("application ExtendVote handler not set")
 	}
 
@@ -560,7 +562,9 @@ func (app *BaseApp) ExtendVote(_ context.Context, req *abci.RequestExtendVote) (
 
 	extsEnabled := cp.Abci != nil && req.Height >= cp.Abci.VoteExtensionsEnableHeight && cp.Abci.VoteExtensionsEnableHeight != 0
 	if !extsEnabled {
-		return nil, fmt.Errorf("vote extensions are not enabled; unexpected call to ExtendVote at height %d", req.Height)
+		err := fmt.Errorf("vote extensions are not enabled; unexpected call to ExtendVote at height %d", req.Height)
+		app.Logger().Debug(err.Error())
+		return nil, err
 	}
 
 	app.voteExtensionState.ctx = app.voteExtensionState.ctx.
@@ -604,8 +608,11 @@ func (app *BaseApp) ExtendVote(_ context.Context, req *abci.RequestExtendVote) (
 // phase. The response MUST be deterministic. An error is returned if vote
 // extensions are not enabled or if verifyVoteExt fails or panics.
 func (app *BaseApp) VerifyVoteExtension(req *abci.RequestVerifyVoteExtension) (resp *abci.ResponseVerifyVoteExtension, err error) {
+	app.Logger().Info("XXX baseapp VerifyVoteExtension")
 	if app.verifyVoteExt == nil {
-		return nil, errors.New("application VerifyVoteExtension handler not set")
+		err := errors.New("application VerifyVoteExtension handler not set")
+		app.Logger().Debug(err.Error())
+		return nil, err
 	}
 
 	// If vote extensions are not enabled, as a safety precaution, we return an
