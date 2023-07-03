@@ -248,6 +248,9 @@ func NewSimApp(
 	bApp.SetVersion(version.Version)
 	bApp.SetInterfaceRegistry(interfaceRegistry)
 	bApp.SetTxEncoder(txConfig.TxEncoder())
+	logger.Info("XXX starting app. Calling into set vote extension handlers")
+	bApp.SetExtendVoteHandler(FooExtendVote())
+	bApp.SetVerifyVoteExtensionHandler(FooVerifyVoteExtensionHandler())
 
 	keys := storetypes.NewKVStoreKeys(
 		authtypes.StoreKey, banktypes.StoreKey, stakingtypes.StoreKey, crisistypes.StoreKey,
@@ -770,4 +773,21 @@ func initParamsKeeper(appCodec codec.BinaryCodec, legacyAmino *codec.LegacyAmino
 	paramsKeeper.Subspace(crisistypes.ModuleName)
 
 	return paramsKeeper
+}
+
+var counter = 0
+
+func FooExtendVote() sdk.ExtendVoteHandler {
+	return func(ctx sdk.Context, req *abci.RequestExtendVote) (*abci.ResponseExtendVote, error) {
+		ctx.Logger().Info("XXX: call to ExtendVote", "height", req.Height, "hash", req.Hash)
+		counter += 1
+		return &abci.ResponseExtendVote{VoteExtension: []byte(fmt.Sprintf("%d", counter))}, nil
+	}
+}
+
+func FooVerifyVoteExtensionHandler() sdk.VerifyVoteExtensionHandler {
+	return func(ctx sdk.Context, req *abci.RequestVerifyVoteExtension) (*abci.ResponseVerifyVoteExtension, error) {
+		ctx.Logger().Info("XXX: call to VerifyVoteExtension", "height", req.Height, "hash", string(req.Hash))
+		return &abci.ResponseVerifyVoteExtension{Status: abci.ResponseVerifyVoteExtension_ACCEPT}, nil
+	}
 }
