@@ -20,6 +20,7 @@ import (
 	"github.com/cometbft/cometbft/node"
 	cmtclient "github.com/cometbft/cometbft/rpc/client"
 	dbm "github.com/cosmos/cosmos-db"
+	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
@@ -419,7 +420,7 @@ func New(l Logger, baseDir string, cfg Config) (*Network, error) {
 
 		logger := log.NewNopLogger()
 		if cfg.EnableLogging {
-			logger = log.NewLogger(os.Stdout) // TODO(mr): enable selection of log destination.
+			logger = log.NewLogger(os.Stdout, log.LevelOption(zerolog.InfoLevel)) // TODO(mr): enable selection of log destination.
 		}
 
 		ctx.Logger = logger
