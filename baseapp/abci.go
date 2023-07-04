@@ -545,11 +545,6 @@ func (app *BaseApp) ProcessProposal(req *abci.RequestProcessProposal) (resp *abc
 // height and are committed in the subsequent height, i.e. H+2. An error is
 // returned if vote extensions are not enabled or if extendVote fails or panics.
 func (app *BaseApp) ExtendVote(_ context.Context, req *abci.RequestExtendVote) (resp *abci.ResponseExtendVote, err error) {
-	// Always reset state given that ExtendVote and VerifyVoteExtension can timeout
-	// and be called again in a subsequent round.
-	emptyHeader := cmtproto.Header{ChainID: app.chainID, Height: req.Height}
-	app.setState(execModeVoteExtension, emptyHeader)
-
 	app.Logger().Info("XXX baseapp ExtendVote")
 	if app.extendVote == nil {
 		app.Logger().Info("XXX ExtendVote handler is nil")
