@@ -597,6 +597,26 @@ func (a *SimApp) Configurator() module.Configurator {
 
 // InitChainer application update at chain initialization
 func (app *SimApp) InitChainer(ctx sdk.Context, req *abci.RequestInitChain) (*abci.ResponseInitChain, error) {
+	app.Logger().Info("XXX setting initial vote extension ctx")
+	app.SetVoteExtensionStateContext(req.InitialHeight)
+
+	params, err := app.ConsensusParamsKeeper.Params(ctx, nil)
+	if err != nil {
+		panic(err)
+	}
+
+	msg := &consensusparamtypes.MsgUpdateParams{
+		Authority: app.ConsensusParamsKeeper.GetAuthority(),
+		Block:     params.GetParams().GetBlock(),
+		Evidence:  params.GetParams().GetEvidence(),
+		Validator: params.GetParams().GetValidator(),
+		Abci:      params.GetParams().GetAbci(),
+	}
+	msg.Abci.VoteExtensionsEnableHeight = 1
+	if _, err := app.ConsensusParamsKeeper.UpdateParams(app.GetVoteExtensionStateContext(), msg); err != nil {
+		panic(err)
+	}
+
 	var genesisState GenesisState
 	if err := json.Unmarshal(req.AppStateBytes, &genesisState); err != nil {
 		panic(err)

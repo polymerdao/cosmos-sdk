@@ -486,6 +486,15 @@ func (app *BaseApp) setState(mode execMode, header cmtproto.Header) {
 	}
 }
 
+func (app *BaseApp) GetVoteExtensionStateContext() sdk.Context {
+	return app.voteExtensionState.ctx
+}
+
+func (app *BaseApp) SetVoteExtensionStateContext(height int64) {
+	emptyHeader := cmtproto.Header{ChainID: app.chainID, Height: height}
+	app.setState(execModeVoteExtension, emptyHeader)
+}
+
 // SetCircuitBreaker sets the circuit breaker for the BaseApp.
 // The circuit breaker is checked on every message execution to verify if a transaction should be executed or not.
 func (app *BaseApp) SetCircuitBreaker(cb CircuitBreaker) {
