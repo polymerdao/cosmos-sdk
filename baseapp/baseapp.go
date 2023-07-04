@@ -208,7 +208,7 @@ func NewBaseApp(
 		app.SetMempool(mempool.NoOpMempool{})
 	}
 
-	abciProposalHandler := NewDefaultProposalHandler(app.mempool, app)
+	abciProposalHandler := NewDefaultProposalHandler(app)
 
 	if app.prepareProposal == nil {
 		app.SetPrepareProposal(abciProposalHandler.PrepareProposalHandler())
@@ -233,6 +233,10 @@ func NewBaseApp(
 	app.cdc = codec.NewProtoCodec(codectypes.NewInterfaceRegistry())
 
 	return app
+}
+
+func (app *BaseApp) GetMempool() mempool.Mempool {
+	return app.mempool
 }
 
 // Name returns the name of the BaseApp.
@@ -823,17 +827,20 @@ func (app *BaseApp) runTx(mode execMode, txBytes []byte) (gInfo sdk.GasInfo, res
 
 	tx, err := app.txDecoder(txBytes)
 	if err != nil {
+		app.Logger().Error("XXX cannot decode tx", "err", err.Error())
 		return sdk.GasInfo{}, nil, nil, err
 	}
 
 	msgs := tx.GetMsgs()
 	if err := validateBasicTxMsgs(msgs); err != nil {
+		app.Logger().Error("XXX cannot validate tx msg", "err", err.Error())
 		return sdk.GasInfo{}, nil, nil, err
 	}
 
 	for _, msg := range msgs {
 		handler := app.msgServiceRouter.Handler(msg)
 		if handler == nil {
+			app.Logger().Error("XXX no handler found")
 			return sdk.GasInfo{}, nil, nil, errorsmod.Wrapf(sdkerrors.ErrUnknownRequest, "no message handler found for %T", msg)
 		}
 	}

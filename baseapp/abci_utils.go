@@ -146,6 +146,7 @@ type (
 	ProposalTxVerifier interface {
 		PrepareProposalVerifyTx(tx sdk.Tx) ([]byte, error)
 		ProcessProposalVerifyTx(txBz []byte) (sdk.Tx, error)
+		GetMempool() mempool.Mempool
 	}
 
 	// DefaultProposalHandler defines the default ABCI PrepareProposal and
@@ -156,9 +157,9 @@ type (
 	}
 )
 
-func NewDefaultProposalHandler(mp mempool.Mempool, txVerifier ProposalTxVerifier) DefaultProposalHandler {
+func NewDefaultProposalHandler(txVerifier ProposalTxVerifier) DefaultProposalHandler {
 	return DefaultProposalHandler{
-		mempool:    mp,
+		mempool:    txVerifier.GetMempool(),
 		txVerifier: txVerifier,
 	}
 }

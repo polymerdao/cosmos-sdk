@@ -3,6 +3,8 @@
 package simapp
 
 import (
+	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -14,6 +16,7 @@ import (
 	"cosmossdk.io/client/v2/autocli"
 	"cosmossdk.io/core/appmodule"
 	"cosmossdk.io/log"
+	"cosmossdk.io/math"
 	storetypes "cosmossdk.io/store/types"
 	"cosmossdk.io/x/circuit"
 	circuitkeeper "cosmossdk.io/x/circuit/keeper"
@@ -32,6 +35,8 @@ import (
 	upgradekeeper "cosmossdk.io/x/upgrade/keeper"
 	upgradetypes "cosmossdk.io/x/upgrade/types"
 	abci "github.com/cometbft/cometbft/abci/types"
+	cryptoenc "github.com/cometbft/cometbft/crypto/encoding"
+	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	dbm "github.com/cosmos/cosmos-db"
 	"github.com/cosmos/cosmos-sdk/baseapp"
 	"github.com/cosmos/cosmos-sdk/client"
@@ -59,7 +64,6 @@ import (
 	authkeeper "github.com/cosmos/cosmos-sdk/x/auth/keeper"
 	"github.com/cosmos/cosmos-sdk/x/auth/posthandler"
 	authsims "github.com/cosmos/cosmos-sdk/x/auth/simulation"
-	"github.com/cosmos/cosmos-sdk/x/auth/tx"
 	authtx "github.com/cosmos/cosmos-sdk/x/auth/tx"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/cosmos/cosmos-sdk/x/auth/vesting"
@@ -103,6 +107,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/staking"
 	stakingkeeper "github.com/cosmos/cosmos-sdk/x/staking/keeper"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
+	goprotoio "github.com/cosmos/gogoproto/io"
 	"github.com/cosmos/gogoproto/proto"
 	"github.com/spf13/cast"
 )
@@ -205,7 +210,7 @@ func NewSimApp(
 	})
 	appCodec := codec.NewProtoCodec(interfaceRegistry)
 	legacyAmino := codec.NewLegacyAmino()
-	txConfig := tx.NewTxConfig(appCodec, tx.DefaultSignModes)
+	txConfig := authtx.NewTxConfig(appCodec, authtx.DefaultSignModes)
 
 	std.RegisterLegacyAminoCodec(legacyAmino)
 	std.RegisterInterfaces(interfaceRegistry)
@@ -276,6 +281,7 @@ func NewSimApp(
 		tkeys:             tkeys,
 	}
 
+	bApp.SetPrepareProposal(app.FooPrepareProposalHandler())
 	app.ParamsKeeper = initParamsKeeper(appCodec, legacyAmino, keys[paramstypes.StoreKey], tkeys[paramstypes.TStoreKey])
 
 	// set the BaseApp's parameter store
@@ -597,7 +603,7 @@ func (a *SimApp) Configurator() module.Configurator {
 
 // InitChainer application update at chain initialization
 func (app *SimApp) InitChainer(ctx sdk.Context, req *abci.RequestInitChain) (*abci.ResponseInitChain, error) {
-	app.Logger().Info("XXX setting initial vote extension ctx")
+	app.Logger().Info("XXX setting initial vote extension ctx ")
 	app.SetVoteExtensionStateContext(req.InitialHeight)
 
 	params, err := app.ConsensusParamsKeeper.Params(ctx, nil)
@@ -799,15 +805,157 @@ var counter = 0
 
 func FooExtendVote() sdk.ExtendVoteHandler {
 	return func(ctx sdk.Context, req *abci.RequestExtendVote) (*abci.ResponseExtendVote, error) {
-		ctx.Logger().Info("XXX: call to ExtendVote", "height", req.Height, "hash", req.Hash)
+
+		ext := VoteExtension{
+			Hash:   req.Hash,
+			Height: req.Height,
+			Data:   []byte(fmt.Sprintf("%d", counter)),
+		}
 		counter += 1
-		return &abci.ResponseExtendVote{VoteExtension: []byte(fmt.Sprintf("%d", counter))}, nil
+		bz, err := json.Marshal(ext)
+		if err != nil {
+			return nil, fmt.Errorf("failed to encode vote extension: %w", err)
+		}
+
+		ctx.Logger().
+			Info("XXX: call to ExtendVote", "height", ext.Height, "hash", hex.EncodeToString(ext.Hash), "data", ext.Data)
+		return &abci.ResponseExtendVote{VoteExtension: bz}, nil
 	}
 }
 
 func FooVerifyVoteExtensionHandler() sdk.VerifyVoteExtensionHandler {
 	return func(ctx sdk.Context, req *abci.RequestVerifyVoteExtension) (*abci.ResponseVerifyVoteExtension, error) {
-		ctx.Logger().Info("XXX: call to VerifyVoteExtension", "height", req.Height, "hash", string(req.Hash))
+
+		var ext VoteExtension
+
+		if err := json.Unmarshal(req.VoteExtension, &ext); err != nil {
+			return &abci.ResponseVerifyVoteExtension{Status: abci.ResponseVerifyVoteExtension_REJECT}, nil
+		}
+
+		ctx.Logger().
+			Info("XXX: call to VerifyVoteExtension", "req.height", req.Height, "req.hash", hex.EncodeToString(req.Hash), "ext.height", ext.Height, "ext.hash", hex.EncodeToString(ext.Hash), "ext.data", ext.Data)
 		return &abci.ResponseVerifyVoteExtension{Status: abci.ResponseVerifyVoteExtension_ACCEPT}, nil
 	}
+}
+
+func (app *SimApp) FooPrepareProposalHandler() sdk.PrepareProposalHandler {
+	abciProposalHandler := baseapp.NewDefaultProposalHandler(app)
+	prepareProposal := abciProposalHandler.PrepareProposalHandler()
+	return func(ctx sdk.Context, req *abci.RequestPrepareProposal) (*abci.ResponsePrepareProposal, error) {
+
+		res, err := prepareProposal(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+
+		if err = app.ValidateVoteExtensions(ctx, req); err != nil {
+			app.Logger().Error("XXX validate vote extension failed", "err", err.Error())
+			return nil, err
+		}
+
+		app.Logger().Info("XXX prepare prososal handler done")
+		return res, err
+	}
+}
+
+var VoteExtensionThreshold = math.LegacyNewDecWithPrec(667, 3)
+
+func (app *SimApp) ValidateVoteExtensions(
+	ctx sdk.Context,
+	req *abci.RequestPrepareProposal,
+) error {
+	currentHeight := req.Height
+	cp := ctx.ConsensusParams()
+	extsEnabled := cp.Abci != nil && currentHeight >= cp.Abci.VoteExtensionsEnableHeight &&
+		cp.Abci.VoteExtensionsEnableHeight != 0
+
+	marshalDelimitedFn := func(msg proto.Message) ([]byte, error) {
+		var buf bytes.Buffer
+		if err := goprotoio.NewDelimitedWriter(&buf).WriteMsg(msg); err != nil {
+			return nil, err
+		}
+
+		return buf.Bytes(), nil
+	}
+
+	extCommit := req.LocalLastCommit
+	sumVP := math.NewInt(0)
+	for _, vote := range extCommit.Votes {
+		if !extsEnabled {
+			if len(vote.VoteExtension) > 0 {
+				return fmt.Errorf(
+					"vote extensions disabled; received non-empty vote extension at height %d",
+					currentHeight,
+				)
+			}
+			if len(vote.ExtensionSignature) > 0 {
+				return fmt.Errorf(
+					"vote extensions disabled; received non-empty vote extension signature at height %d",
+					currentHeight,
+				)
+			}
+
+			continue
+		}
+
+		if len(vote.ExtensionSignature) == 0 {
+			return fmt.Errorf(
+				"vote extensions enabled; received empty vote extension signature at height %d",
+				currentHeight,
+			)
+		}
+
+		valConsAddr := vote.Validator.Address
+		app.Logger().Info("XXX got vote from validator", "validator", hex.EncodeToString(valConsAddr))
+		validator, err := app.StakingKeeper.GetValidatorByConsAddr(ctx, valConsAddr)
+		if err != nil {
+			return fmt.Errorf("failed to get validator %X: %w", valConsAddr, err)
+		}
+
+		cmtPubKeyProto, err := validator.CmtConsPublicKey()
+		if err != nil {
+			return fmt.Errorf("failed to get validator %X public key: %w", valConsAddr, err)
+		}
+
+		cmtPubKey, err := cryptoenc.PubKeyFromProto(cmtPubKeyProto)
+		if err != nil {
+			return fmt.Errorf("failed to convert validator %X public key: %w", valConsAddr, err)
+		}
+
+		cve := cmtproto.CanonicalVoteExtension{
+			Extension: vote.VoteExtension,
+			Height:    currentHeight - 1, // the vote extension was signed in the previous height
+			Round:     int64(extCommit.Round),
+			ChainId:   app.ChainID(),
+		}
+
+		extSignBytes, err := marshalDelimitedFn(&cve)
+		if err != nil {
+			return fmt.Errorf("failed to encode CanonicalVoteExtension: %w", err)
+		}
+
+		if !cmtPubKey.VerifySignature(extSignBytes, vote.ExtensionSignature) {
+			return fmt.Errorf("failed to verify validator %X vote extension signature", valConsAddr)
+		}
+
+		sumVP = sumVP.Add(validator.BondedTokens())
+	}
+
+	// Ensure we have at least 2/3 voting power that submitted valid vote
+	// extensions.
+	totalVP, err := app.StakingKeeper.TotalBondedTokens(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get total bonded tokens: %w", err)
+	}
+
+	percentSubmitted := math.LegacyNewDecFromInt(sumVP).Quo(math.LegacyNewDecFromInt(totalVP))
+	if percentSubmitted.LT(VoteExtensionThreshold) {
+		return fmt.Errorf(
+			"insufficient cumulative voting power received to verify vote extensions; got: %s, expected: >=%s",
+			percentSubmitted,
+			VoteExtensionThreshold,
+		)
+	}
+
+	return nil
 }

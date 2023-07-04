@@ -736,7 +736,9 @@ func (app *BaseApp) FinalizeBlock(req *abci.RequestFinalizeBlock) (*abci.Respons
 
 		if _, err := app.txDecoder(rawTx); err == nil {
 			response = app.deliverTx(rawTx)
+			app.Logger().Info("XXX deliver tx worked", "response", response)
 		} else {
+			app.Logger().Error("XXX deliver tx failed", "err", err.Error())
 			// In the case where a transaction included in a block proposal is malformed,
 			// we still want to return a default response to comet. This is because comet
 			// expects a response for each transaction included in a block proposal.
