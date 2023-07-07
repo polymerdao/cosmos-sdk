@@ -764,6 +764,13 @@ func (app *BaseApp) FinalizeBlock(req *abci.RequestFinalizeBlock) (*abci.Respons
 	}
 
 	events = append(events, endBlock.Events...)
+
+	event := abci.Event{Type: "foo", Attributes: []abci.EventAttribute{
+		{Key: "key1", Value: "value1"},
+	}}
+	events = append(events, event)
+	events = sdk.MarkEventsToIndex(events, app.indexEvents)
+
 	cp := app.GetConsensusParams(app.finalizeBlockState.ctx)
 
 	return &abci.ResponseFinalizeBlock{
