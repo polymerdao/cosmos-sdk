@@ -558,7 +558,8 @@ func (app *BaseApp) Query(req abci.RequestQuery) (res abci.ResponseQuery) {
 		return handleQueryP2P(app, path)
 	}
 
-	return sdkerrors.QueryResult(sdkerrors.Wrap(sdkerrors.ErrUnknownRequest, "unknown query path"), app.trace)
+	msg := fmt.Sprintf("unknown query path. path[0]: %s, fullpath: %s", path[0], req.Path)
+	return sdkerrors.QueryResult(sdkerrors.Wrap(sdkerrors.ErrUnknownRequest, msg), app.trace)
 }
 
 // ListSnapshots implements the ABCI interface. It delegates to app.snapshotManager if set.
