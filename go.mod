@@ -13,7 +13,7 @@ require (
 	github.com/99designs/keyring v1.2.1
 	github.com/armon/go-metrics v0.4.1
 	github.com/bgentry/speakeasy v0.1.1-0.20220910012023-760eaf8b6816
-	github.com/btcsuite/btcd/btcec/v2 v2.3.2
+	github.com/btcsuite/btcd/btcec/v2 v2.3.4
 	github.com/chzyer/readline v1.5.1
 	github.com/cockroachdb/apd/v2 v2.0.2
 	github.com/cometbft/cometbft v0.37.2
@@ -180,6 +180,9 @@ require (
 replace (
 	// use cosmos fork of keyring
 	github.com/99designs/keyring => github.com/cosmos/keyring v1.2.0
+
+	// replace required for updated github.com/btcsuite/btcd/btcec/v2 v2.3.4
+	github.com/cometbft/cometbft => github.com/polymerdao/cometbft v0.37.2-polymer-op-v1.9.1
 	// polymerdao fork of gogoproto
 	github.com/cosmos/gogoproto => github.com/polymerdao/gogoproto v0.0.0-20230905135849-dbeac9fa0743
 	// dgrijalva/jwt-go is deprecated and doesn't receive security updates.
